@@ -1,0 +1,17 @@
+{
+  "name": "เอาหยังบ่",
+  "short_name": "เอาหยังบ่",
+  "description": "สั่งอาหารง่าย ๆ แถวบ้าน",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF8E7",
+  "theme_color": "#9C4A35",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
