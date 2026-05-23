@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { Store } from '@/lib/types'
 
 const storeIcons: Record<string, string> = {
@@ -27,6 +28,7 @@ interface StoreCardProps {
 export default function StoreCard({ store, selected, onSelect }: StoreCardProps) {
   const icon = storeIcons[store.id] || '🏪'
   const gradient = storeColors[store.id] || 'from-gray-200 to-gray-100'
+  const [imgError, setImgError] = useState(false)
 
   return (
     <button
@@ -37,8 +39,17 @@ export default function StoreCard({ store, selected, onSelect }: StoreCardProps)
           : 'border-gray-100 shadow-sm'
       }`}
     >
-      <div className={`h-28 bg-gradient-to-br ${gradient} flex items-center justify-center relative`}>
-        <span className="text-5xl">{icon}</span>
+      <div className={`h-28 relative overflow-hidden ${store.image_url && !imgError ? '' : `bg-gradient-to-br ${gradient} flex items-center justify-center`}`}>
+        {store.image_url && !imgError ? (
+          <img
+            src={store.image_url}
+            alt={store.name}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <span className="text-5xl">{icon}</span>
+        )}
         <span
           className={`absolute top-2 right-2 text-xs px-2 py-0.5 rounded-full font-medium ${
             store.status === 'open'

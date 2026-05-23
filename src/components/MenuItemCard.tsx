@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { MenuItem } from '@/lib/types'
 import { Minus, Plus } from 'lucide-react'
 
@@ -39,11 +40,21 @@ const categoryColors: Record<string, string> = {
 export default function MenuItemCard({ item, qty = 0, onAdd, onRemove }: MenuItemCardProps) {
   const emoji = categoryEmoji[item.category || ''] || '🍽️'
   const badgeColor = categoryColors[item.category || ''] || 'bg-gray-100 text-gray-600'
+  const [imgError, setImgError] = useState(false)
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-3 flex items-center gap-3 transition-all hover:border-gray-200 hover:shadow-sm">
-      <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-[#FFF8E7] to-orange-100 flex items-center justify-center shrink-0 text-2xl">
-        {emoji}
+      <div className={`h-14 w-14 rounded-xl shrink-0 overflow-hidden ${item.image_url && !imgError ? '' : 'bg-gradient-to-br from-[#FFF8E7] to-orange-100 flex items-center justify-center text-2xl'}`}>
+        {item.image_url && !imgError ? (
+          <img
+            src={item.image_url}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          emoji
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">

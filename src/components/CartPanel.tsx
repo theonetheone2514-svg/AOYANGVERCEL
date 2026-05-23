@@ -1,8 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Minus, Plus, ShoppingBag, Truck, ChevronRight } from 'lucide-react'
 import type { MenuItem } from '@/lib/types'
+
+const categoryEmoji: Record<string, string> = {
+  'ก๋วยเตี๋ยว': '🍜', 'ของทอด': '🍤', 'ข้าว': '🍚', 'ส้มตำ': '🥗',
+  'ย่าง': '🍖', 'ลาบ': '🥩', 'น้ำตก': '🥘', 'ต้ม': '🍲', 'ซุป': '🥣', 'เครื่องดื่ม': '🥤',
+}
 
 interface CartItem {
   item: MenuItem
@@ -16,6 +21,23 @@ interface CartPanelProps {
   onUpdateQty: (item: MenuItem, delta: number) => void
   isLoggedIn: boolean
   deliveryFee?: number
+}
+
+function CartItemThumb({ item }: { item: MenuItem }) {
+  const [imgError, setImgError] = useState(false)
+  const emoji = categoryEmoji[item.category || ''] || '🍽️'
+
+  if (item.image_url && !imgError) {
+    return (
+      <img
+        src={item.image_url}
+        alt={item.name}
+        className="w-full h-full object-cover"
+        onError={() => setImgError(true)}
+      />
+    )
+  }
+  return <span>{emoji}</span>
 }
 
 export default function CartPanel({
@@ -67,8 +89,8 @@ export default function CartPanel({
                 key={item.id}
                 className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3"
               >
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[#FFF8E7] to-orange-100 flex items-center justify-center shrink-0 text-xl">
-                  🍽️
+                <div className="h-12 w-12 rounded-xl shrink-0 overflow-hidden bg-gradient-to-br from-[#FFF8E7] to-orange-100 flex items-center justify-center text-xl">
+                  <CartItemThumb item={item} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-[#3E2723] text-sm truncate">{item.name}</p>
