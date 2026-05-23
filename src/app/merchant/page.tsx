@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/AuthContext'
 import AuthWrapper from '@/components/AuthWrapper'
 import UserMenu from '@/components/UserMenu'
-import LoadingSpinner from '@/components/LoadingSpinner'
+import { StatsCardSkeleton } from '@/components/Skeleton'
 import OrdersTab from './OrdersTab'
 import MenuTab from './MenuTab'
 import StatementTab from './StatementTab'
@@ -38,7 +38,7 @@ export default function MerchantPage() {
   return (
     <AuthWrapper requiredRole={['merchant']}>
       <div className="min-h-dvh bg-[#FFF8E7] flex flex-col">
-        <header className="bg-[#9C4A35] text-white px-4 py-3 flex items-center justify-between">
+        <header className="bg-gradient-to-r from-[#9C4A35] to-[#E65100] text-white px-4 py-3 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold">{store?.name || 'ร้านค้า'}</h1>
             <p className="text-sm opacity-90">จัดการออเดอร์และเมนู</p>
@@ -47,7 +47,13 @@ export default function MerchantPage() {
         </header>
 
         {loading ? (
-          <LoadingSpinner />
+          <div className="flex-1 p-4 space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+            </div>
+          </div>
         ) : (
           <>
             {/* Tab bar */}

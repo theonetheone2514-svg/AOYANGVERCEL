@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/AuthContext'
 import AuthWrapper from '@/components/AuthWrapper'
 import UserMenu from '@/components/UserMenu'
-import LoadingSpinner from '@/components/LoadingSpinner'
 import DashboardTab from './DashboardTab'
 import MembersTab from './MembersTab'
 import RidersTab from './RidersTab'
@@ -26,7 +25,7 @@ export default function AdminPage() {
   return (
     <AuthWrapper requiredRole={['admin']}>
       <div className="min-h-dvh bg-[#FFF8E7] flex flex-col">
-        <header className="bg-[#9C4A35] text-white px-4 py-3 flex items-center justify-between">
+        <header className="bg-gradient-to-r from-[#9C4A35] to-[#E65100] text-white px-4 py-3 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold">จัดการระบบ</h1>
             <p className="text-sm opacity-90">สำหรับผู้ดูแลระบบ</p>
