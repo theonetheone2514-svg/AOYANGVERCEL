@@ -67,16 +67,16 @@ insert into riders (id, phone, name, earnings, jobs_count, zone_id, online) valu
   (gen_random_uuid(), '0867890123', 'มานะ ขยันดี', 0, 0, 'Z01', false)
 on conflict (phone) do nothing;
 
--- Zones (เพิ่มโซน)
+-- Zones (เพิ่มโซน) — ศูนย์กลางที่ บ้านสูงเนิน สกลนคร
 insert into zones (id, name, lat, lng, radius, status) values
-  ('Z02', 'โซนตะวันออก', 14.05, 100.05, 3.0, 'open'),
-  ('Z03', 'โซนตะวันตก', 13.95, 99.95, 2.5, 'open')
+  ('Z02', 'โซนตะวันออก', 17.32, 103.99, 4.5, 'open'),
+  ('Z03', 'โซนตะวันตก', 17.27, 103.93, 4.5, 'open')
 on conflict (id) do nothing;
 
 -- Settings if not exist
 insert into settings (key, value) values
   ('delivery_fee', '10'),
-  ('radius', '3'),
+  ('radius', '4.5'),
   ('commission_rate', '0.15'),
   ('markup', '0'),
   ('app_name', 'เอาหยังบ่'),

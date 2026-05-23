@@ -1,3 +1,10 @@
+export const DEFAULT_LOCATION = {
+  lat: 17.293067,
+  lng: 103.969910,
+  name: 'เอาหยังบ่',
+  address: 'บ้านสูงเนิน',
+}
+
 export function formatPrice(amount: number): string {
   return `${amount.toFixed(2)} บาท`
 }

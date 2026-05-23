@@ -18,8 +18,8 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
   useEffect(() => {
     if (mapContainerRef.current && !mapRef.current) {
       mapRef.current = L.map(mapContainerRef.current, {
-        center: [14.0, 100.0],
-        zoom: 13,
+        center: [17.293067, 103.969910],
+        zoom: 15,
         zoomControl: !readOnly,
       })
 

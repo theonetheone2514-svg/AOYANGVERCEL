@@ -146,5 +146,5 @@ insert into settings (key, value) values ('markup', '0') on conflict (key) do no
 
 -- Insert default zones
 insert into zones (id, name, lat, lng, radius, status) values
-  ('Z01', 'โซนกลาง', 14.0, 100.0, 3.0, 'open')
+  ('Z01', 'โซนกลาง', 17.293067, 103.969910, 4.5, 'open')
 on conflict (id) do nothing;

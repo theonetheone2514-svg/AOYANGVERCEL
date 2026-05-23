@@ -12,6 +12,7 @@ import StoreCard from '@/components/StoreCard'
 import MenuItemCard from '@/components/MenuItemCard'
 import CartPanel from '@/components/CartPanel'
 import { StoreCardSkeleton, MenuItemSkeleton } from '@/components/Skeleton'
+import { DEFAULT_LOCATION } from '@/lib/utils'
 
 const MapView = dynamic(() => import('@/components/Map'), { ssr: false })
 
@@ -28,7 +29,7 @@ export default function Home() {
   const [cart, setCart] = useState<Map<string, { item: MenuItem; qty: number }>>(new Map())
   const [showCart, setShowCart] = useState(false)
   const [zones, setZones] = useState<Zone[]>([])
-  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number }>(DEFAULT_LOCATION)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
 
@@ -170,15 +171,12 @@ export default function Home() {
         {selectedLocation && (
           <div className="bg-white rounded-xl px-4 py-2.5 border border-gray-100 flex items-center gap-2 text-sm">
             <span className="text-lg">📍</span>
-            <span className="text-[#3E2723]">
-              พิกัด: {selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}
-            </span>
-            <button
-              onClick={() => setSelectedLocation(null)}
-              className="ml-auto text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
+            <div className="text-[#3E2723]">
+              <span className="font-medium">{DEFAULT_LOCATION.address}</span>
+              <span className="text-gray-400 ml-2">
+                ({selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)})
+              </span>
+            </div>
           </div>
         )}
 
