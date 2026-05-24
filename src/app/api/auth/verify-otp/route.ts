@@ -33,12 +33,24 @@ export async function POST(request: Request) {
 
   const { data: store } = await supabase.from('stores').select('id').eq('phone', phone).single()
   if (store) {
+    // Check if store is deactivated by admin
+    const { data: deactivated } = await supabase
+      .from('settings').select('value').eq('key', `deactivated_store:${store.id}`).single()
+    if (deactivated?.value === 'true') {
+      return NextResponse.json({ error: 'ร้านค้าถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, { status: 403 })
+    }
     userType = 'merchant'
     userId = store.id
   }
 
   const { data: rider } = await supabase.from('riders').select('id').eq('phone', phone).single()
   if (rider) {
+    // Check if rider is deactivated by admin
+    const { data: deactivated } = await supabase
+      .from('settings').select('value').eq('key', `deactivated_rider:${rider.id}`).single()
+    if (deactivated?.value === 'true') {
+      return NextResponse.json({ error: 'ไรเดอร์ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, { status: 403 })
+    }
     userType = 'rider'
     userId = rider.id
   }

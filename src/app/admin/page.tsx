@@ -7,15 +7,17 @@ import AuthWrapper from '@/components/AuthWrapper'
 import UserMenu from '@/components/UserMenu'
 import DashboardTab from './DashboardTab'
 import MembersTab from './MembersTab'
+import StoresTab from './StoresTab'
 import RidersTab from './RidersTab'
 import AdminSettingsTab from './AdminSettingsTab'
 
-type Tab = 'dashboard' | 'members' | 'riders' | 'settings'
+type Tab = 'dashboard' | 'members' | 'stores' | 'riders' | 'settings'
 
 export default function AdminPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'dashboard', label: '📊 ภาพรวม' },
     { key: 'members', label: '👤 สมาชิก' },
+    { key: 'stores', label: '🏪 ร้านค้า' },
     { key: 'riders', label: '🛵 ไรเดอร์' },
     { key: 'settings', label: '⚙️ ตั้งค่า' },
   ]
@@ -52,6 +54,7 @@ export default function AdminPage() {
         <main className="flex-1 overflow-y-auto">
           {tab === 'dashboard' && <DashboardTab />}
           {tab === 'members' && <MembersTab />}
+          {tab === 'stores' && <StoresTab />}
           {tab === 'riders' && <RidersTab />}
           {tab === 'settings' && <AdminSettingsTab />}
         </main>
