@@ -1,89 +1,205 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { formatPrice, cn } from '@/lib/utils'
+import { formatPrice } from '@/lib/utils'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import EmptyState from '@/components/EmptyState'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 interface Props {
   storeId: string
 }
 
+const defaultCategories = ['ก๋วยเตี๋ยว', 'ของทอด', 'ข้าว', 'ส้มตำ', 'ย่าง', 'ลาบ', 'น้ำตก', 'ต้ม', 'ซุป', 'เครื่องดื่ม']
+const categoryEmoji: Record<string, string> = {
+  'ก๋วยเตี๋ยว': '🍜', 'ของทอด': '🍤', 'ข้าว': '🍚', 'ส้มตำ': '🥗',
+  'ย่าง': '🍖', 'ลาบ': '🥩', 'น้ำตก': '🥘', 'ต้ม': '🍲', 'ซุป': '🥣', 'เครื่องดื่ม': '🥤',
+}
+
 export default function MenuTab({ storeId }: Props) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState<any | null>(null)
-  const [newItem, setNewItem] = useState({ name: '', price: '', category: '', stock: 99 })
+  const [categories, setCategories] = useState<string[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [form, setForm] = useState({ name: '', price: '', category: '', stock: 99, image_url: '' })
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!storeId) return
-    supabase.from('menu_items').select('*').eq('store_id', storeId).order('name').then(({ data }) => {
-      if (data) setItems(data)
-      setLoading(false)
-    })
+    const { data } = await supabase
+      .from('menu_items').select('*').eq('store_id', storeId).order('category').order('name')
+    if (data) {
+      setItems(data)
+      const cats = [...new Set(data.map((i) => i.category).filter(Boolean))]
+      setCategories(cats)
+    }
+    setLoading(false)
   }, [storeId])
 
+  useEffect(() => { load() }, [load])
+
+  function resetForm() {
+    setForm({ name: '', price: '', category: '', stock: 99, image_url: '' })
+    setShowForm(false)
+    setEditId(null)
+  }
+
   async function addItem() {
-    if (!newItem.name || !newItem.price) return
+    if (!form.name || !form.price) return
     const { data } = await supabase.from('menu_items').insert({
       store_id: storeId,
-      name: newItem.name,
-      price: Number(newItem.price),
-      category: newItem.category || null,
-      stock: Number(newItem.stock),
+      name: form.name,
+      price: Number(form.price),
+      category: form.category || null,
+      stock: Number(form.stock),
+      image_url: form.image_url || null,
     }).select().single()
     if (data) setItems((prev) => [...prev, data])
-    setNewItem({ name: '', price: '', category: '', stock: 99 })
+    resetForm()
   }
 
-  async function updateItem(id: string, updates: any) {
-    const { data } = await supabase.from('menu_items').update(updates).eq('id', id).select().single()
-    if (data) setItems((prev) => prev.map((i) => (i.id === id ? data : i)))
-    setEditing(null)
+  async function saveEdit() {
+    if (!editId || !form.name || !form.price) return
+    const { data } = await supabase.from('menu_items').update({
+      name: form.name,
+      price: Number(form.price),
+      category: form.category || null,
+      stock: Number(form.stock),
+      image_url: form.image_url || null,
+    }).eq('id', editId).select().single()
+    if (data) setItems((prev) => prev.map((i) => (i.id === editId ? data : i)))
+    resetForm()
   }
 
-  async function deleteItem(id: string) {
-    await supabase.from('menu_items').delete().eq('id', id)
-    setItems((prev) => prev.filter((i) => i.id !== id))
+  function startEdit(item: any) {
+    setForm({
+      name: item.name,
+      price: String(item.price),
+      category: item.category || '',
+      stock: item.stock ?? 99,
+      image_url: item.image_url || '',
+    })
+    setEditId(item.id)
+    setShowForm(true)
+  }
+
+  async function deleteItem() {
+    if (!deleteTarget) return
+    await supabase.from('menu_items').delete().eq('id', deleteTarget.id)
+    setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id))
+    setDeleteTarget(null)
+  }
+
+  async function updateStock(item: any, delta: number) {
+    const newStock = Math.max(0, (item.stock ?? 0) + delta)
+    await supabase.from('menu_items').update({ stock: newStock }).eq('id', item.id)
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, stock: newStock } : i)))
   }
 
   if (loading) return <LoadingSpinner />
 
   return (
     <div className="p-4 space-y-4">
-      {/* Add new item form */}
-      <div className="bg-white rounded-lg border p-3 space-y-2">
-        <h3 className="font-semibold text-sm text-[#3E2723]">เพิ่มเมนูใหม่</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <input
-            placeholder="ชื่อเมนู"
-            value={newItem.name}
-            onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-            className="border rounded px-3 py-2 text-sm col-span-2"
-          />
-          <input
-            placeholder="ราคา"
-            type="number"
-            value={newItem.price}
-            onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-            className="border rounded px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="หมวดหมู่"
-            value={newItem.category}
-            onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-            className="border rounded px-3 py-2 text-sm"
-          />
-        </div>
-        <button
-          onClick={addItem}
-          disabled={!newItem.name || !newItem.price}
-          className="w-full bg-[#E65100] text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
-        >
-          เพิ่มเมนู
-        </button>
+      {/* Header + Add button */}
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-[#3E2723]">เมนูทั้งหมด ({items.length})</h2>
+        {!showForm && (
+          <button
+            onClick={() => { resetForm(); setShowForm(true) }}
+            className="bg-[#E65100] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d44900] transition"
+          >
+            + เพิ่มเมนู
+          </button>
+        )}
       </div>
+
+      {/* Add / Edit form */}
+      {showForm && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-sm">
+          <h3 className="font-semibold text-sm text-[#3E2723]">
+            {editId ? 'แก้ไขเมนู' : 'เพิ่มเมนูใหม่'}
+          </h3>
+          <input
+            placeholder="ชื่อเมนู *"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#E65100]"
+            autoFocus
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              placeholder="ราคา *"
+              type="number"
+              value={form.price}
+              onChange={(e) => setForm({ ...form, price: e.target.value })}
+              className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#E65100]"
+            />
+            <input
+              placeholder="stock"
+              type="number"
+              value={form.stock}
+              onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+              className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#E65100]"
+            />
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#E65100] bg-white appearance-none"
+            >
+              <option value="">ไม่มีหมวดหมู่</option>
+              {[...new Set([...defaultCategories, ...categories])].map((c) => (
+                <option key={c} value={c}>{categoryEmoji[c] || '🍽️'} {c}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => {
+                const cat = prompt('ชื่อหมวดหมู่ใหม่:')
+                if (cat?.trim()) {
+                  setForm({ ...form, category: cat.trim() })
+                  setCategories((prev) => [...new Set([...prev, cat.trim()])])
+                }
+              }}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm hover:bg-gray-50 transition shrink-0"
+              title="เพิ่มหมวดหมู่ใหม่"
+            >
+              +
+            </button>
+          </div>
+          <input
+            placeholder="URL รูปอาหาร (ไม่บังคับ)"
+            value={form.image_url}
+            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#E65100]"
+          />
+          {form.image_url && (
+            <div className="h-24 rounded-lg overflow-hidden bg-gray-100">
+              <img src={form.image_url} alt="preview" className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block' }}
+              />
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={editId ? saveEdit : addItem}
+              disabled={!form.name || !form.price}
+              className="flex-1 bg-[#E65100] text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 hover:bg-[#d44900] transition"
+            >
+              {editId ? 'บันทึก' : 'เพิ่มเมนู'}
+            </button>
+            <button
+              onClick={resetForm}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Menu list */}
       {items.length === 0 ? (
@@ -91,51 +207,69 @@ export default function MenuTab({ storeId }: Props) {
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
-            <div key={item.id} className="bg-white rounded-lg border p-3">
-              {editing?.id === item.id ? (
-                <div className="space-y-2">
-                  <input
-                    defaultValue={editing.name}
-                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                    className="border rounded px-3 py-1.5 text-sm w-full"
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      defaultValue={editing.price}
-                      onChange={(e) => setEditing({ ...editing, price: e.target.value })}
-                      className="border rounded px-3 py-1.5 text-sm flex-1"
+            <div key={item.id} className="bg-white rounded-xl border border-gray-100 p-3 transition hover:border-gray-200">
+              <div className="flex items-center gap-3">
+                {/* Thumbnail */}
+                <div className="h-14 w-14 rounded-xl shrink-0 overflow-hidden bg-gradient-to-br from-[#FFF8E7] to-orange-100 flex items-center justify-center text-2xl">
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.textContent = categoryEmoji[item.category] || '🍽️' }}
                     />
-                    <button onClick={() => updateItem(item.id, { name: editing.name, price: Number(editing.price) })}
-                      className="bg-green-600 text-white px-3 py-1.5 rounded text-sm"
-                    >บันทึก</button>
-                    <button onClick={() => setEditing(null)}
-                      className="bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm"
-                    >ยกเลิก</button>
+                  ) : (
+                    <span>{categoryEmoji[item.category] || '🍽️'}</span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-medium text-[#3E2723] text-sm truncate">{item.name}</span>
+                    {item.category && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {item.category}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-semibold text-[#E65100] mt-0.5">
+                    {formatPrice(item.price)}
                   </div>
                 </div>
-              ) : (
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-[#3E2723]">{item.name}</div>
-                    <div className="flex gap-2 text-xs text-gray-500">
-                      <span>{formatPrice(item.price)}</span>
-                      {item.category && <span>• {item.category}</span>}
-                      <span>• stock: {item.stock}</span>
-                    </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Stock controls */}
+                  <div className="flex items-center gap-1 mr-1">
+                    <button
+                      onClick={() => updateStock(item, -1)}
+                      disabled={(item.stock ?? 0) <= 0}
+                      className="w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs flex items-center justify-center hover:bg-gray-200 disabled:opacity-30 transition"
+                    >−</button>
+                    <span className="text-xs font-medium text-gray-600 w-5 text-center">{item.stock ?? 0}</span>
+                    <button
+                      onClick={() => updateStock(item, 1)}
+                      className="w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs flex items-center justify-center hover:bg-gray-200 transition"
+                    >+</button>
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => setEditing({ ...item })}
-                      className="text-xs text-blue-600 underline">แก้ไข</button>
-                    <button onClick={() => deleteItem(item.id)}
-                      className="text-xs text-red-600 underline">ลบ</button>
-                  </div>
+                  <button onClick={() => startEdit(item)}
+                    className="text-xs text-blue-600 font-medium px-2 py-1 hover:bg-blue-50 rounded transition">แก้ไข</button>
+                  <button onClick={() => setDeleteTarget(item)}
+                    className="text-xs text-red-600 font-medium px-2 py-1 hover:bg-red-50 rounded transition">ลบ</button>
                 </div>
-              )}
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="ลบเมนู?"
+        danger
+        message={`แน่ใจว่าจะลบ "${deleteTarget?.name}"? การกระทำนี้ไม่สามารถกู้คืนได้`}
+        confirmLabel="ลบเลย"
+        onConfirm={deleteItem}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }
