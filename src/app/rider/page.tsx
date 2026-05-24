@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext'
 import AuthWrapper from '@/components/AuthWrapper'
 import UserMenu from '@/components/UserMenu'
 import { StatsCardSkeleton } from '@/components/Skeleton'
+import ToastContainer from '@/components/Toast'
 import JobsTab from './JobsTab'
 import HistoryTab from './HistoryTab'
 import RiderSettingsTab from './RiderSettingsTab'
@@ -44,6 +45,7 @@ export default function RiderPage() {
           <UserMenu />
         </header>
 
+        <ToastContainer />
         {loading ? (
           <div className="flex-1 p-4 space-y-4">
             <div className="grid grid-cols-3 gap-3">

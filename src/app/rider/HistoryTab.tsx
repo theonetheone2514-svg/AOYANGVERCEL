@@ -32,6 +32,30 @@ export default function HistoryTab({ riderId }: Props) {
   const totalEarnings = completed.reduce((s, o) => s + Number(o.delivery_fee || 10), 0)
   const cancelled = orders.filter((o) => o.status === 'ยกเลิก')
 
+  // Group by date
+  const byDate: Record<string, { orders: typeof completed; total: number }> = {}
+  completed.forEach((o) => {
+    const day = new Date(o.created_at).toLocaleDateString('th-TH')
+    if (!byDate[day]) byDate[day] = { orders: [], total: 0 }
+    byDate[day].orders.push(o)
+    byDate[day].total += Number(o.delivery_fee || 10)
+  })
+  const dateKeys = Object.keys(byDate).sort((a, b) => {
+    const [da, db] = [a.split('/'), b.split('/')]
+    return new Date(+da[2], +da[1] - 1, +da[0]).getTime() -
+           new Date(+db[2], +db[1] - 1, +db[0]).getTime()
+  }).reverse()
+
+  // Label helper
+  const todayLabel = new Date().toLocaleDateString('th-TH')
+  const yesterdayLabel = new Date(Date.now() - 86400000).toLocaleDateString('th-TH')
+
+  const dateLabel = (d: string) => {
+    if (d === todayLabel) return 'วันนี้'
+    if (d === yesterdayLabel) return 'เมื่อวาน'
+    return d
+  }
+
   if (loading) return <LoadingSpinner />
 
   return (
@@ -51,6 +75,24 @@ export default function HistoryTab({ riderId }: Props) {
           <div className="text-xs text-gray-500">ยกเลิก</div>
         </div>
       </div>
+
+      {/* Daily earnings */}
+      {dateKeys.length > 0 && (
+        <div className="bg-white rounded-lg border p-3">
+          <h3 className="font-semibold text-sm text-[#3E2723] mb-2">📊 รายได้ตามวัน</h3>
+          <div className="space-y-1">
+            {dateKeys.map((day) => (
+              <div key={day} className="flex justify-between items-center py-1.5 border-b last:border-0 border-gray-100">
+                <span className="text-sm text-gray-700">{dateLabel(day)}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400">{byDate[day].orders.length} งาน</span>
+                  <span className="text-sm font-semibold text-green-600">+{formatPrice(byDate[day].total)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* History list */}
       <div>

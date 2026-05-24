@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice, getElapsedMinutes } from '@/lib/utils'
+import { showOrderToast } from '@/components/Toast'
 import EmptyState from '@/components/EmptyState'
 import LoadingSpinner from '@/components/LoadingSpinner'
 
@@ -15,20 +16,35 @@ export default function JobsTab({ rider, onUpdate }: Props) {
   const [available, setAvailable] = useState<any[]>([])
   const [active, setActive] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const seenIds = useRef<Set<string>>(new Set())
 
   const loadJobs = useCallback(async () => {
     const { data: pending } = await supabase
       .from('orders')
-      .select('*, items:order_items(*), stores(name)')
+      .select('*, items:order_items(*), stores(name), customers(name, phone)')
       .eq('status', 'พร้อมจัดส่ง')
-      .order('created_at', { ascending: false })
 
-    if (pending) setAvailable(pending.filter((o) => !o.rider_id))
+    if (pending) {
+      const unassigned = pending.filter((o) => !o.rider_id)
+      unassigned.forEach((o) => {
+        if (!seenIds.current.has(o.id)) {
+          seenIds.current.add(o.id)
+          const itemsText = (o.items || []).map((i: any) => `${i.qty}x ${i.name}`).join(', ')
+          showOrderToast({
+            id: o.id,
+            title: '🆕 งานใหม่!',
+            message: `${o.stores?.name || ''} — ${itemsText}`,
+            total: Number(o.total),
+          })
+        }
+      })
+      setAvailable(unassigned)
+    }
 
     if (rider?.id) {
       const { data: myJobs } = await supabase
         .from('orders')
-        .select('*, items:order_items(*), stores(name)')
+        .select('*, items:order_items(*), stores(name), customers(name, phone)')
         .eq('rider_id', rider.id)
         .in('status', ['กำลังจัดส่ง'])
         .order('created_at', { ascending: false })
@@ -45,10 +61,19 @@ export default function JobsTab({ rider, onUpdate }: Props) {
   }, [loadJobs])
 
   async function acceptJob(orderId: string) {
-    await supabase.from('orders').update({
-      rider_id: rider.id,
-      status: 'กำลังจัดส่ง',
-    }).eq('id', orderId)
+    const { data } = await supabase
+      .from('orders')
+      .update({ rider_id: rider.id, status: 'กำลังจัดส่ง' })
+      .eq('id', orderId)
+      .is('rider_id', null)
+      .select()
+      .single()
+
+    if (!data) {
+      alert('⚠️ ออเดอร์นี้มีไรเดอร์รับไปแล้ว')
+      loadJobs()
+      return
+    }
 
     await supabase.from('riders').update({ online: true }).eq('id', rider.id)
     onUpdate({ ...rider, online: true })
@@ -107,15 +132,42 @@ export default function JobsTab({ rider, onUpdate }: Props) {
                     <div key={item.id}>{item.qty}x {item.name}</div>
                   ))}
                 </div>
+                {order.customers?.name && (
+                  <p className="text-xs text-gray-600">👤 {order.customers.name}</p>
+                )}
+                {order.customers?.phone && (
+                  <p className="text-xs text-gray-600">📞 {order.customers.phone}</p>
+                )}
                 {order.address && (
                   <p className="text-xs text-gray-400">📍 {order.address}</p>
                 )}
-                <button
-                  onClick={() => completeJob(order.id)}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-medium"
-                >
-                  ✅ ส่งสำเร็จ
-                </button>
+                <div className="flex gap-2">
+                  {(order.lat && order.lng) ? (
+                    <a
+                      href={`https://www.google.com/maps?q=${order.lat},${order.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 border border-blue-300 text-blue-700 py-2 rounded-lg text-sm font-medium text-center"
+                    >
+                      🗺️ เปิดแผนที่
+                    </a>
+                  ) : order.address ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 border border-blue-300 text-blue-700 py-2 rounded-lg text-sm font-medium text-center"
+                    >
+                      🗺️ เปิดแผนที่
+                    </a>
+                  ) : null}
+                  <button
+                    onClick={() => completeJob(order.id)}
+                    className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-medium"
+                  >
+                    ✅ ส่งสำเร็จ
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -142,16 +194,43 @@ export default function JobsTab({ rider, onUpdate }: Props) {
                     <div key={item.id}>{item.qty}x {item.name}</div>
                   ))}
                 </div>
+                {order.customers?.name && (
+                  <p className="text-xs text-gray-600">👤 {order.customers.name}</p>
+                )}
+                {order.customers?.phone && (
+                  <p className="text-xs text-gray-600">📞 {order.customers.phone}</p>
+                )}
                 {order.address && (
                   <p className="text-xs text-gray-400">📍 {order.address}</p>
                 )}
-                <button
-                  onClick={() => acceptJob(order.id)}
-                  disabled={!rider?.online}
-                  className="w-full bg-[#E65100] text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-                >
-                  รับงาน
-                </button>
+                <div className="flex gap-2">
+                  {(order.lat && order.lng) ? (
+                    <a
+                      href={`https://www.google.com/maps?q=${order.lat},${order.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 border border-blue-300 text-blue-700 py-2 rounded-lg text-sm font-medium text-center"
+                    >
+                      🗺️ แผนที่
+                    </a>
+                  ) : order.address ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 border border-blue-300 text-blue-700 py-2 rounded-lg text-sm font-medium text-center"
+                    >
+                      🗺️ แผนที่
+                    </a>
+                  ) : null}
+                  <button
+                    onClick={() => acceptJob(order.id)}
+                    disabled={!rider?.online}
+                    className="flex-1 bg-[#E65100] text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                  >
+                    รับงาน
+                  </button>
+                </div>
               </div>
             ))}
           </div>
