@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
+import PwaRegister from "@/components/PwaRegister";
 
 export const metadata: Metadata = {
   title: "เอาหยังบ่ | สั่งอาหารออนไลน์",
@@ -41,9 +42,14 @@ export default function RootLayout({
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossOrigin=""
         />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
       </head>
       <body className="min-h-dvh flex flex-col">
-        <ClientLayout>{children}</ClientLayout>
+        <ClientLayout>
+          <PwaRegister />
+          {children}
+        </ClientLayout>
       </body>
     </html>
   );
