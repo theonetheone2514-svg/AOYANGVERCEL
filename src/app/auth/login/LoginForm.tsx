@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/lib/AuthContext'
 
 export default function LoginForm() {
@@ -145,9 +146,20 @@ export default function LoginForm() {
           )}
         </div>
 
-        <p className="text-center text-xs text-white/60 mt-4">
-          ยังไม่มีบัญชี? สมัครอัตโนมัติเมื่อเข้าสู่ระบบครั้งแรก
-        </p>
+        <div className="text-center mt-4 space-y-1">
+          <p className="text-xs text-white/60">
+            ต้องการสมัครสมาชิก?
+          </p>
+          <div className="flex items-center justify-center gap-3 text-xs">
+            <Link href="/auth/register" className="text-white/80 hover:text-white underline underline-offset-2 transition">
+              สมัครร้านค้า
+            </Link>
+            <span className="text-white/30">|</span>
+            <Link href="/auth/register" className="text-white/80 hover:text-white underline underline-offset-2 transition">
+              สมัครไรเดอร์
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   )
