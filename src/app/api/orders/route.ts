@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { pushMessage, textMessage } from '@/lib/line'
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -44,21 +45,15 @@ export async function POST(request: Request) {
   const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
   if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 })
 
-  // Send LINE notification
-  fetch(new URL('/api/line/send', request.url), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'new_order',
-      order_id: order.id,
-      store_id,
-      total,
-      items: orderItems,
-      customer_id,
-      note,
-      address,
-    }),
-  }).catch(() => {})
+  // LINE push to merchant
+  if (process.env.LINE_USER_ID) {
+    const itemsText = orderItems.map((i: { name: string; price: number; qty: number }) => `  ${i.qty}x ${i.name}  ${i.price * i.qty} บาท`).join('\n')
+    pushMessage(process.env.LINE_USER_ID, [
+      textMessage(
+        `🆕 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n${itemsText}\n━━━━━━━━━━━━━━\n💵 รวม: ${total} บาท\n📍 ${address || 'ไม่ระบุ'}\n📝 ${note || '-'}\n━━━━━━━━━━━━━━\n#${order.id.slice(0, 8)}`
+      ),
+    ])
+  }
 
   return NextResponse.json({ ...order, items: orderItems }, { status: 201 })
 }

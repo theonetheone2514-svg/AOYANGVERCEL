@@ -10,11 +10,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .from('orders').update(body).eq('id', id).select('*, items:order_items(*)').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Send LINE notification on status change
+  // LINE push on status change
   if (body.status && process.env.LINE_USER_ID) {
     const itemsText = (data.items || []).map((i: any) => `  ${i.qty}x ${i.name}`).join('\n')
+    const statusEmoji: Record<string, string> = {
+      'รอดำเนินการ': '📋', 'กำลังเตรียมอาหาร': '👨‍🍳', 'พร้อมจัดส่ง': '📦',
+      'กำลังจัดส่ง': '🛵', 'จัดส่งสำเร็จ': '✅', 'ยกเลิก': '❌',
+    }
     pushMessage(process.env.LINE_USER_ID, [
-      textMessage(`📋 อัปเดตออเดอร์ #${id.slice(0, 8)}\nสถานะ: ${body.status}\n━━━━━━━━━━━━━━\n${itemsText}\n💵 รวม: ${data.total} บาท\n━━━━━━━━━━━━━━`),
+      textMessage(
+        `${statusEmoji[body.status] || '📋'} อัปเดตออเดอร์\n━━━━━━━━━━━━━━\nเลขที่: #${id.slice(0, 8)}\nสถานะ: ${body.status}\n━━━━━━━━━━━━━━\n${itemsText}\n💵 รวม: ${data.total} บาท\n━━━━━━━━━━━━━━`
+      ),
     ])
   }
 

@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice, getElapsedMinutes, getStatusColor, cn } from '@/lib/utils'
+import { showOrderToast } from '@/components/Toast'
 import EmptyState from '@/components/EmptyState'
-import LoadingSpinner from '@/components/LoadingSpinner'
+import { StatsCardSkeleton } from '@/components/Skeleton'
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 
 interface Props {
   storeId: string
@@ -21,6 +23,7 @@ export default function OrdersTab({ storeId }: Props) {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
+  const loadedRef = useRef(false)
 
   const loadOrders = useCallback(async () => {
     if (!storeId) return
@@ -32,17 +35,75 @@ export default function OrdersTab({ storeId }: Props) {
       .limit(50)
     if (data) setOrders(data)
     setLoading(false)
+    loadedRef.current = true
   }, [storeId])
 
   useEffect(() => {
     loadOrders()
-    const interval = setInterval(loadOrders, 10000)
-    return () => clearInterval(interval)
-  }, [loadOrders])
+
+    // Backup polling every 30s (in case Realtime not enabled)
+    const pollInterval = setInterval(loadOrders, 30000)
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`orders-${storeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+          filter: `store_id=eq.${storeId}`,
+        },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          const newOrder = payload.new
+          // Fetch with items
+          supabase
+            .from('orders')
+            .select('*, items:order_items(*)')
+            .eq('id', newOrder.id)
+            .single()
+            .then(({ data }) => {
+              if (data) {
+                setOrders((prev) => [data, ...prev])
+                const itemsText = (data.items || []).map((i: any) => `${i.qty}x ${i.name}`).join(', ')
+                showOrderToast({
+                  id: data.id,
+                  title: '🆕 ออเดอร์ใหม่!',
+                  message: itemsText,
+                  total: Number(data.total),
+                })
+              }
+            })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `store_id=eq.${storeId}`,
+        },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          const updated = payload.new as any
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === updated.id ? { ...o, ...updated } : o
+            )
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      clearInterval(pollInterval)
+      supabase.removeChannel(channel)
+    }
+  }, [loadOrders, storeId])
 
   async function updateStatus(orderId: string, status: string) {
     await supabase.from('orders').update({ status }).eq('id', orderId)
-    loadOrders()
   }
 
   const filteredOrders = filter === 'all'
@@ -56,7 +117,17 @@ export default function OrdersTab({ storeId }: Props) {
     ['จัดส่งสำเร็จ', 'ยกเลิก'].includes(o.status)
   )
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return (
+      <div className="p-4 space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 space-y-4">
