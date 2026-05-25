@@ -13,7 +13,9 @@ import MenuItemCard from '@/components/MenuItemCard'
 import CartPanel from '@/components/CartPanel'
 import { StoreCardSkeleton, MenuItemSkeleton } from '@/components/Skeleton'
 import { DEFAULT_LOCATION } from '@/lib/utils'
+import { getIsanGreeting } from '@/lib/greeting'
 import { MapPin, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react'
+import Link from 'next/link'
 
 const MapView = dynamic(() => import('@/components/Map'), { ssr: false })
 
@@ -37,6 +39,7 @@ export default function Home() {
   const [showMap, setShowMap] = useState(false)
   const prevCount = useRef(0)
   const [bounce, setBounce] = useState(false)
+  const greeting = getIsanGreeting()
 
   useEffect(() => {
     Promise.all([loadStores(), loadZones()])
@@ -228,9 +231,10 @@ export default function Home() {
             </div>
             <UserMenu />
           </div>
-          <p className="text-sm text-orange-100 mt-1 mb-3 font-medium">
-            ของกินใกล้ตัว อร่อยจนต้องสั่ง ✨
-          </p>
+          <div className="text-center my-4">
+            <p className="text-base font-bold drop-shadow-sm">{greeting.header}</p>
+            <p className="text-sm text-orange-100 mt-1">{greeting.sub}</p>
+          </div>
           <SearchBar
             value={search}
             onChange={setSearch}
@@ -410,6 +414,18 @@ export default function Home() {
           isLoggedIn={!!user}
         />
       )}
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-100 px-4 py-6 mt-6">
+        <div className="text-center text-xs text-gray-400 space-y-1.5">
+          <p className="text-sm font-medium text-gray-600">🍜 เอาหยังบ่</p>
+          <p>📍 บ้านสูงเนิน สกลนคร</p>
+          <p>📞 092-989-2085</p>
+          <Link href="/about" className="inline-block mt-2 text-[#E65100] font-medium hover:underline">
+            📍 เกี่ยวกับเรา
+          </Link>
+        </div>
+      </footer>
     </div>
   )
 }
