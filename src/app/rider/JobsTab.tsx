@@ -16,6 +16,8 @@ export default function JobsTab({ rider, onUpdate }: Props) {
   const [available, setAvailable] = useState<any[]>([])
   const [active, setActive] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [confirmOrder, setConfirmOrder] = useState<any>(null)
+  const [confirming, setConfirming] = useState(false)
   const seenIds = useRef<Set<string>>(new Set())
 
   const loadJobs = useCallback(async () => {
@@ -80,10 +82,13 @@ export default function JobsTab({ rider, onUpdate }: Props) {
     loadJobs()
   }
 
-  async function completeJob(orderId: string) {
+  async function confirmDelivered() {
+    if (!confirmOrder) return
+    setConfirming(true)
+
+    const orderId = confirmOrder.id
     const { data: order } = await supabase
       .from('orders').select('delivery_fee').eq('id', orderId).single()
-
     const fee = Number(order?.delivery_fee || 10)
 
     const { data: current } = await supabase
@@ -101,13 +106,15 @@ export default function JobsTab({ rider, onUpdate }: Props) {
       earnings: (Number(current?.earnings) || 0) + fee,
       jobs_count: (current?.jobs_count || 0) + 1,
     })
+    setConfirmOrder(null)
+    setConfirming(false)
     loadJobs()
   }
 
   if (loading) return <LoadingSpinner />
 
   return (
-    <div className="p-4 space-y-6">
+    <><div className="p-4 space-y-6">
       {/* Online status indicator */}
       <div className="flex items-center gap-2 bg-white rounded-lg border p-3">
         <div className={`w-3 h-3 rounded-full ${rider?.online ? 'bg-green-500' : 'bg-gray-400'}`} />
@@ -126,6 +133,12 @@ export default function JobsTab({ rider, onUpdate }: Props) {
                 <div className="flex justify-between">
                   <span className="font-medium text-blue-800">{order.stores?.name}</span>
                   <span className="text-xs text-gray-500">{getElapsedMinutes(order.created_at)} นาที</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs">
+                  {order.payment_method === 'transfer'
+                    ? <span className="text-purple-600">💳 โอน</span>
+                    : <span className="text-green-700">💵 เงินสด</span>
+                  }
                 </div>
                 <div className="text-sm text-gray-600">
                   {(order.items || []).map((item: any) => (
@@ -162,7 +175,7 @@ export default function JobsTab({ rider, onUpdate }: Props) {
                     </a>
                   ) : null}
                   <button
-                    onClick={() => completeJob(order.id)}
+                    onClick={() => setConfirmOrder(order)}
                     className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-medium"
                   >
                     ✅ ส่งสำเร็จ
@@ -237,5 +250,52 @@ export default function JobsTab({ rider, onUpdate }: Props) {
         )}
       </section>
     </div>
+
+      {/* Payment confirmation modal */}
+      {confirmOrder && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => !confirming && setConfirmOrder(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-[#3E2723] text-center">
+              {confirmOrder.payment_method === 'transfer' ? '💳 ยืนยันการโอน' : '💵 ยืนยันรับเงินสด'}
+            </h3>
+
+            {confirmOrder.payment_method === 'transfer' ? (
+              <div className="space-y-3 text-center">
+                <p className="text-sm text-gray-600">ให้ลูกค้าสแกน QR เพื่อชำระ</p>
+                <img
+                  src={`https://promptpay.io/0929892085/${confirmOrder.total}.png`}
+                  alt="PromptPay QR"
+                  className="w-48 h-48 mx-auto rounded-lg border"
+                />
+                <p className="text-xs text-gray-400">พร้อมเพย์: 0929892085</p>
+                <p className="text-sm font-semibold text-[#E65100]">ยอด {formatPrice(confirmOrder.total)}</p>
+              </div>
+            ) : (
+              <div className="text-center space-y-2">
+                <p className="text-sm text-gray-600">ได้รับเงินสดจากลูกค้าแล้วหรือยัง?</p>
+                <p className="text-lg font-bold text-green-700">{formatPrice(confirmOrder.total)}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmOrder(null)}
+                disabled={confirming}
+                className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium"
+              >
+                ย้อนกลับ
+              </button>
+              <button
+                onClick={confirmDelivered}
+                disabled={confirming}
+                className="flex-1 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {confirming ? 'กำลังยืนยัน...' : confirmOrder.payment_method === 'transfer' ? '✅ ลูกค้าโอนแล้ว' : '✅ รับเงินแล้ว'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

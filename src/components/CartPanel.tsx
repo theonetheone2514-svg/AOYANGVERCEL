@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Minus, Plus, ShoppingBag, Truck, ChevronRight } from 'lucide-react'
+import { X, Minus, Plus, ShoppingBag, Truck, ChevronRight, Wallet, QrCode } from 'lucide-react'
 import type { MenuItem } from '@/lib/types'
 
 const categoryEmoji: Record<string, string> = {
@@ -17,7 +17,7 @@ interface CartItem {
 interface CartPanelProps {
   items: Map<string, CartItem>
   onClose: () => void
-  onCheckout: () => void
+  onCheckout: (paymentMethod: 'cash' | 'transfer') => void
   onUpdateQty: (item: MenuItem, delta: number) => void
   isLoggedIn: boolean
   deliveryFee?: number
@@ -56,6 +56,7 @@ export default function CartPanel({
   const cartArray = Array.from(items.values())
   const subtotal = cartArray.reduce((sum, { item, qty }) => sum + Number(item.price) * qty, 0)
   const total = subtotal + deliveryFee
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('transfer')
 
   return (
     <>
@@ -118,6 +119,35 @@ export default function CartPanel({
           </div>
         )}
 
+        {/* Payment method */}
+        <div className="bg-white border-t border-gray-100 px-4 py-3">
+          <p className="text-xs font-medium text-gray-500 mb-2">💳 วิธีการชำระ</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPaymentMethod('transfer')}
+              className={`flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition ${
+                paymentMethod === 'transfer'
+                  ? 'border-[#E65100] bg-orange-50 text-[#E65100]'
+                  : 'border-gray-200 text-gray-500'
+              }`}
+            >
+              <QrCode className="w-4 h-4" />
+              โอน (PromptPay)
+            </button>
+            <button
+              onClick={() => setPaymentMethod('cash')}
+              className={`flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition ${
+                paymentMethod === 'cash'
+                  ? 'border-[#E65100] bg-orange-50 text-[#E65100]'
+                  : 'border-gray-200 text-gray-500'
+              }`}
+            >
+              <Wallet className="w-4 h-4" />
+              เงินสด
+            </button>
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="bg-white border-t border-gray-100 px-4 py-4 space-y-3">
           <div className="space-y-1.5 text-sm">
@@ -138,7 +168,7 @@ export default function CartPanel({
           </div>
 
           <button
-            onClick={onCheckout}
+            onClick={() => onCheckout(paymentMethod)}
             disabled={cartArray.length === 0}
             className="w-full py-3 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition disabled:opacity-50 bg-gradient-to-r from-[#E65100] to-[#F57C00] text-white hover:shadow-lg active:scale-[0.98]"
           >

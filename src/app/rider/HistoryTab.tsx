@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { formatPrice } from '@/lib/utils'
+import { formatPrice, cn } from '@/lib/utils'
 import EmptyState from '@/components/EmptyState'
 import LoadingSpinner from '@/components/LoadingSpinner'
 
@@ -108,6 +108,14 @@ export default function HistoryTab({ riderId }: Props) {
                     <span className="font-medium text-sm">{order.stores?.name}</span>
                     <span className="text-xs text-gray-400 ml-2">
                       {new Date(order.created_at).toLocaleDateString('th-TH')}
+                    </span>
+                    <span className={cn(
+                      'ml-1 text-xs px-1.5 py-0.5 rounded-full',
+                      order.payment_method === 'transfer'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-green-100 text-green-700'
+                    )}>
+                      {order.payment_method === 'transfer' ? '💳' : '💵'}
                     </span>
                   </div>
                   <span className="text-sm font-semibold text-green-600">

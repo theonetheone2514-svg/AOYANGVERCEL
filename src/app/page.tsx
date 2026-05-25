@@ -32,6 +32,7 @@ export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number }>(DEFAULT_LOCATION)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
+  const [ordering, setOrdering] = useState(false)
 
   useEffect(() => {
     Promise.all([loadStores(), loadZones()])
@@ -123,7 +124,7 @@ export default function Home() {
     return groups
   }, [filteredMenu])
 
-  function handleCheckout() {
+  async function handleCheckout(paymentMethod: 'cash' | 'transfer') {
     if (!user) {
       router.push('/auth/login?redirect=/')
       return
@@ -132,8 +133,67 @@ export default function Home() {
       alert('กรุณาเลือกพิกัดจัดส่งบนแผนที่')
       return
     }
+    if (!selectedStore) return
+
+    setOrdering(true)
+
+    let { data: customer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('phone', user.phone)
+      .single()
+    if (!customer) {
+      const { data: newCust } = await supabase
+        .from('customers')
+        .insert({ phone: user.phone })
+        .select()
+        .single()
+      customer = newCust
+    }
+    if (!customer) {
+      alert('เกิดข้อผิดพลาดในการสร้างผู้ใช้')
+      setOrdering(false)
+      return
+    }
+
+    const items = Array.from(cart.values()).map(({ item, qty }) => ({
+      menu_id: item.id,
+      name: item.name,
+      price: item.price,
+      qty,
+    }))
+    const total = cartTotal + 10
+
+    const { data: order, error } = await supabase
+      .from('orders')
+      .insert({
+        customer_id: customer.id,
+        store_id: selectedStore.id,
+        total,
+        delivery_fee: 10,
+        lat: selectedLocation.lat,
+        lng: selectedLocation.lng,
+        address: DEFAULT_LOCATION.address,
+        payment_method: paymentMethod,
+        status: 'รอดำเนินการ',
+      })
+      .select()
+      .single()
+
+    if (error || !order) {
+      alert('สั่งออเดอร์ไม่สำเร็จ: ' + (error?.message || ''))
+      setOrdering(false)
+      return
+    }
+
+    await supabase.from('order_items').insert(
+      items.map((i) => ({ ...i, order_id: order.id }))
+    )
+
+    setCart(new Map())
     setShowCart(false)
-    alert('สั่งออเดอร์แล้ว! กำลังรอการยืนยันจากร้านค้า')
+    setOrdering(false)
+    alert('✅ สั่งออเดอร์สำเร็จ! รอร้านค้ายืนยัน')
   }
 
   return (

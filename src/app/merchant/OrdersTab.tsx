@@ -186,6 +186,14 @@ export default function OrdersTab({ storeId }: Props) {
                     <span className={cn('ml-2 text-xs px-2 py-0.5 rounded-full', getStatusColor(order.status))}>
                       {order.status}
                     </span>
+                    <span className={cn(
+                      'ml-1 text-xs px-2 py-0.5 rounded-full',
+                      order.payment_method === 'transfer'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-green-100 text-green-700'
+                    )}>
+                      {order.payment_method === 'transfer' ? '💳 โอน' : '💵 เงินสด'}
+                    </span>
                   </div>
                   <span className="font-bold text-[#E65100]">{formatPrice(order.total)}</span>
                 </div>
