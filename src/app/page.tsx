@@ -223,7 +223,7 @@ export default function Home() {
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-3xl drop-shadow-lg">🍜</span>
+              <img src="/logo.png" alt="เอาหยังบ่" className="h-12 w-12 drop-shadow-lg" />
               <div>
                 <h1 className="text-2xl font-bold drop-shadow-sm">เอาหยังบ่</h1>
                 <p className="text-xs opacity-90">สั่งอาหารง่าย ๆ แถวบ้าน</p>

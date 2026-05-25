@@ -58,7 +58,7 @@ export default function LoginForm() {
       <div className="w-full max-w-sm animate-fade-in">
         {/* Brand */}
         <div className="text-center mb-6">
-          <div className="text-6xl mb-3">🍜</div>
+          <img src="/logo.png" alt="เอาหยังบ่" className="h-16 w-16 mx-auto mb-3" />
           <h1 className="text-3xl font-bold text-white">เอาหยังบ่</h1>
           <p className="text-white/80 text-sm mt-1">เข้าสู่ระบบเพื่อสั่งอาหาร</p>
         </div>

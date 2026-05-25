@@ -42,8 +42,8 @@ export default function RootLayout({
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossOrigin=""
         />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
+        <link rel="icon" type="image/png" href="/logo.png" />
       </head>
       <body className="min-h-dvh flex flex-col">
         <ClientLayout>

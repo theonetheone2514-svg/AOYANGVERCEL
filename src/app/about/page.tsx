@@ -4,7 +4,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-dvh bg-[#FFF8E7] flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto text-center space-y-6">
-        <span className="text-7xl">🍜</span>
+        <img src="/logo.png" alt="เอาหยังบ่" className="h-20 w-20" />
         <h1 className="text-3xl font-bold text-[#3E2723]">เอาหยังบ่</h1>
         <p className="text-gray-600 text-base leading-relaxed">
           แพลตฟอร์มสั่งอาหารบ้านสูงเนิน สกลนคร<br />
