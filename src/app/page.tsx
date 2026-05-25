@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +13,7 @@ import MenuItemCard from '@/components/MenuItemCard'
 import CartPanel from '@/components/CartPanel'
 import { StoreCardSkeleton, MenuItemSkeleton } from '@/components/Skeleton'
 import { DEFAULT_LOCATION } from '@/lib/utils'
+import { MapPin, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react'
 
 const MapView = dynamic(() => import('@/components/Map'), { ssr: false })
 
@@ -33,6 +34,9 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
   const [ordering, setOrdering] = useState(false)
+  const [showMap, setShowMap] = useState(false)
+  const prevCount = useRef(0)
+  const [bounce, setBounce] = useState(false)
 
   useEffect(() => {
     Promise.all([loadStores(), loadZones()])
@@ -89,6 +93,14 @@ export default function Home() {
     () => Array.from(cart.values()).reduce((sum, { qty }) => sum + qty, 0),
     [cart]
   )
+
+  useEffect(() => {
+    if (cartCount > prevCount.current && prevCount.current > 0) {
+      setBounce(true)
+      setTimeout(() => setBounce(false), 400)
+    }
+    prevCount.current = cartCount
+  }, [cartCount])
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     setSelectedLocation({ lat, lng })
@@ -198,54 +210,81 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-dvh bg-[#FFF8E7] pb-24">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-[#9C4A35] to-[#E65100] text-white px-4 pt-4 pb-6">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-3xl">🍜</span>
-            <div>
-              <h1 className="text-2xl font-bold">เอาหยังบ่</h1>
-              <p className="text-xs opacity-90">สั่งอาหารง่าย ๆ แถวบ้าน</p>
-            </div>
-          </div>
-          <UserMenu />
+      {/* Hero Header */}
+      <header className="relative bg-gradient-to-br from-[#BF360C] via-[#E65100] to-[#F57C00] text-white px-4 pt-4 pb-10 overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/20 rounded-full" />
+          <div className="absolute top-12 left-1/2 w-16 h-16 bg-white/10 rounded-full" />
         </div>
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="ค้นหาร้านหรือเมนู..."
-        />
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-3xl drop-shadow-lg">🍜</span>
+              <div>
+                <h1 className="text-2xl font-bold drop-shadow-sm">เอาหยังบ่</h1>
+                <p className="text-xs opacity-90">สั่งอาหารง่าย ๆ แถวบ้าน</p>
+              </div>
+            </div>
+            <UserMenu />
+          </div>
+          <p className="text-sm text-orange-100 mt-1 mb-3 font-medium">
+            ของกินใกล้ตัว อร่อยจนต้องสั่ง ✨
+          </p>
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="ค้นหาเมนูเด็ด..."
+          />
+        </div>
       </header>
 
-      <main className="flex-1 px-4 space-y-4 -mt-3">
-        {/* Map */}
-        <section className="bg-white rounded-xl shadow-sm overflow-hidden h-56 border border-gray-100">
-          <MapView
-            zones={zones}
-            selectedLocation={selectedLocation}
-            onClick={handleMapClick}
-          />
-        </section>
-
-        {/* Selected location */}
-        {selectedLocation && (
-          <div className="bg-white rounded-xl px-4 py-2.5 border border-gray-100 flex items-center gap-2 text-sm">
-            <span className="text-lg">📍</span>
-            <div className="text-[#3E2723]">
-              <span className="font-medium">{DEFAULT_LOCATION.address}</span>
-              <span className="text-gray-400 ml-2">
-                ({selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)})
-              </span>
-            </div>
+      <main className="flex-1 px-4 space-y-4 -mt-6 relative z-20">
+        {/* Map toggle */}
+        <button
+          onClick={() => setShowMap(!showMap)}
+          className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3 flex items-center justify-between transition hover:shadow-md"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="w-4 h-4 text-[#E65100]" />
+            <span className="text-gray-600">
+              {selectedLocation ? DEFAULT_LOCATION.address : 'เลือกพิกัดจัดส่ง'}
+            </span>
           </div>
+          {showMap ? (
+            <ChevronUp className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          )}
+        </button>
+
+        {showMap && (
+          <>
+            <section className="bg-white rounded-2xl shadow-sm overflow-hidden h-48 border border-gray-100">
+              <MapView
+                zones={zones}
+                selectedLocation={selectedLocation}
+                onClick={handleMapClick}
+              />
+            </section>
+            {selectedLocation && (
+              <div className="bg-orange-50 rounded-xl px-4 py-2.5 border border-orange-100 flex items-center gap-2 text-sm">
+                <span className="text-lg">📍</span>
+                <span className="text-gray-600 text-xs">
+                  ({selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)})
+                </span>
+              </div>
+            )}
+          </>
         )}
 
         {/* Stores */}
         <section>
           <h2 className="text-lg font-bold text-[#3E2723] mb-3 flex items-center gap-2">
-            <span>🏪</span> ร้านค้า
+            <span className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center text-sm">🏪</span>
+            ร้านค้าใกล้คุณ
             {!loadingStores && (
-              <span className="text-sm font-normal text-gray-500">({filteredStores.length} ร้าน)</span>
+              <span className="text-sm font-normal text-gray-400">({filteredStores.length})</span>
             )}
           </h2>
           {loadingStores ? (
@@ -253,9 +292,10 @@ export default function Home() {
               {[1, 2, 3, 4].map((i) => <StoreCardSkeleton key={i} />)}
             </div>
           ) : filteredStores.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center text-gray-400">
-              <p className="text-lg mb-1">😕</p>
-              <p>ไม่พบร้านค้า</p>
+            <div className="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm">
+              <p className="text-4xl mb-2">😕</p>
+              <p className="font-medium">ไม่พบร้านค้า</p>
+              {search && <p className="text-sm mt-1">ลองเปลี่ยนคำค้นหา</p>}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -276,31 +316,35 @@ export default function Home() {
           <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold text-[#3E2723] flex items-center gap-2">
-                <span>📋</span> เมนู {selectedStore.name}
+                <span className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center text-sm">📋</span>
+                เมนู {selectedStore.name}
               </h2>
               <button
                 onClick={() => setSelectedStore(null)}
-                className="text-sm text-gray-500 hover:text-[#E65100] transition px-3 py-1 rounded-full hover:bg-orange-50"
+                className="text-sm text-gray-400 hover:text-[#E65100] transition px-3 py-1.5 rounded-full hover:bg-orange-50"
               >
                 ✕ ปิด
               </button>
             </div>
 
-            {/* Category chips */}
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-none">
-              {allCategories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setCategory(cat)}
-                  className={`whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                    category === cat
-                      ? 'bg-[#E65100] text-white shadow-sm'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:border-[#E65100] hover:text-[#E65100]'
-                  }`}
-                >
-                  {cat === 'ทั้งหมด' ? '🍽️ ทั้งหมด' : cat}
-                </button>
-              ))}
+            {/* Category pills */}
+            <div className="relative mb-3">
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {allCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={`whitespace-nowrap px-3.5 py-2 rounded-xl text-sm font-medium transition-all shrink-0 ${
+                      category === cat
+                        ? 'bg-gradient-to-r from-[#E65100] to-[#F57C00] text-white shadow-md shadow-orange-200'
+                        : 'bg-white text-gray-600 border border-gray-200 hover:border-[#E65100] hover:text-[#E65100] hover:shadow-sm'
+                    }`}
+                  >
+                    {cat === 'ทั้งหมด' ? '🍽️ ทั้งหมด' : cat}
+                  </button>
+                ))}
+              </div>
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#FFF8E7] to-transparent pointer-events-none" />
             </div>
 
             {loadingMenu ? (
@@ -308,16 +352,19 @@ export default function Home() {
                 {[1, 2, 3, 4].map((i) => <MenuItemSkeleton key={i} />)}
               </div>
             ) : filteredMenu.length === 0 ? (
-              <div className="bg-white rounded-xl p-8 text-center text-gray-400">
-                <p className="text-lg mb-1">😕</p>
-                <p>ไม่พบเมนู</p>
+              <div className="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm">
+                <p className="text-4xl mb-2">😕</p>
+                <p className="font-medium">ไม่พบเมนู</p>
                 {search && <p className="text-sm mt-1">ลองเปลี่ยนคำค้นหา</p>}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {Array.from(groupedMenu.entries()).map(([cat, items]) => (
                   <div key={cat}>
-                    <h3 className="text-sm font-semibold text-gray-500 mb-2 px-1">{cat}</h3>
+                    <h3 className="text-sm font-semibold text-gray-500 mb-2 px-1 flex items-center gap-1.5">
+                      <span className="w-1 h-4 rounded-full bg-[#E65100]" />
+                      {cat}
+                    </h3>
                     <div className="space-y-2">
                       {items.map((item) => (
                         <MenuItemCard
@@ -341,12 +388,15 @@ export default function Home() {
       {cartCount > 0 && (
         <button
           onClick={() => setShowCart(true)}
-          className="fixed bottom-20 right-4 bg-gradient-to-r from-[#E65100] to-[#F57C00] text-white rounded-full px-5 py-3 shadow-lg flex items-center gap-2 z-40 hover:shadow-xl transition active:scale-95"
+          className={`fixed bottom-20 right-4 bg-gradient-to-r from-[#E65100] to-[#F57C00] text-white rounded-full px-5 py-3.5 shadow-lg flex items-center gap-2.5 z-40 hover:shadow-xl transition active:scale-95 ${bounce ? 'animate-bounce' : ''}`}
         >
-          <span className="bg-white text-[#E65100] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-            {cartCount}
-          </span>
-          <span className="font-semibold">{cartTotal.toLocaleString()} บาท</span>
+          <div className="relative">
+            <ShoppingBag className="w-5 h-5" />
+            <span className="absolute -top-2 -right-2 bg-white text-[#E65100] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
+              {cartCount}
+            </span>
+          </div>
+          <span className="font-bold">{cartTotal.toLocaleString()} ฿</span>
         </button>
       )}
 
