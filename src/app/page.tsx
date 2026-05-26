@@ -32,7 +32,7 @@ export default function Home() {
   const [cart, setCart] = useState<Map<string, { item: MenuItem; qty: number }>>(new Map())
   const [showCart, setShowCart] = useState(false)
   const [zones, setZones] = useState<Zone[]>([])
-  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number }>(DEFAULT_LOCATION)
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
   const [ordering, setOrdering] = useState(false)
@@ -107,6 +107,7 @@ export default function Home() {
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     setSelectedLocation({ lat, lng })
+    setShowMap(false)
   }, [])
 
   const filteredStores = useMemo(() => {
@@ -247,12 +248,16 @@ export default function Home() {
         {/* Map toggle */}
         <button
           onClick={() => setShowMap(!showMap)}
-          className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3 flex items-center justify-between transition hover:shadow-md"
+          className={`w-full rounded-2xl border px-4 py-3 flex items-center justify-between transition hover:shadow-md ${
+            selectedLocation
+              ? 'bg-white shadow-sm border-gray-100'
+              : 'bg-orange-50 border-orange-200 shadow-sm'
+          }`}
         >
           <div className="flex items-center gap-2 text-sm">
-            <MapPin className="w-4 h-4 text-[#E65100]" />
-            <span className="text-gray-600">
-              {selectedLocation ? DEFAULT_LOCATION.address : 'เลือกพิกัดจัดส่ง'}
+            <MapPin className={`w-4 h-4 ${selectedLocation ? 'text-[#E65100]' : 'text-orange-500'}`} />
+            <span className={selectedLocation ? 'text-gray-600' : 'text-orange-700 font-medium'}>
+              {selectedLocation ? `📍 ${DEFAULT_LOCATION.address}` : '📍 เลือกพิกัดจัดส่ง'}
             </span>
           </div>
           {showMap ? (
