@@ -2,9 +2,23 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { createSession, getSessionCookieHeaders } from '@/lib/auth'
 import { ADMIN_PHONES } from '@/lib/constants'
+import { rateLimit, getIp } from '@/lib/rate-limit'
+import { validate, verifyOtpSchema } from '@/lib/validations'
 
 export async function POST(request: Request) {
-  const { phone, otp } = await request.json()
+  const ip = getIp(request)
+  const rl = rateLimit(`verify-otp:${ip}`, { maxRequests: 10, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'โหลดเยอะเกินไป กรุณาลองใหม่ภายหลัง' }, {
+      status: 429,
+      headers: { 'Retry-After': String(rl.retryAfter) }
+    })
+  }
+
+  const body = await request.json()
+  const validated = validate(verifyOtpSchema, body)
+  if (validated.error) return validated.error
+  const { phone, otp } = validated.data!
 
   if (!phone || !otp) {
     return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, { status: 400 })

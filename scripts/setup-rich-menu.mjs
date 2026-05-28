@@ -3,20 +3,63 @@
 // Creates a Rich Menu with tap areas for: เมนู, ผูกเบอร์, สถานะ, ช่วยเหลือ
 
 const LINE_API = 'https://api.line.me/v2/bot'
+const LINE_DATA_API = 'https://api-data.line.me/v2/bot'
 
-async function main() {
+async function getHeaders() {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
   if (!token) {
     console.error('❌ ต้องตั้ง LINE_CHANNEL_ACCESS_TOKEN ใน .env.local ก่อน')
     process.exit(1)
   }
-
-  const headers = {
+  return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
   }
+}
 
-  // 1. Create rich menu
+async function deleteExistingRichMenus(headers) {
+  const listRes = await fetch(`${LINE_API}/richmenu/list`, { headers })
+  if (!listRes.ok) return
+
+  const { richmenus } = await listRes.json()
+  for (const rm of richmenus || []) {
+    if (rm.name === 'เอาหยังบ่ Main Menu') {
+      console.log(`🗑️  ลบ Rich Menu เก่า: ${rm.richMenuId}`)
+      await fetch(`${LINE_API}/richmenu/${rm.richMenuId}`, { method: 'DELETE', headers })
+    }
+  }
+}
+
+async function generateImage() {
+  const sharp = (await import('sharp')).default
+
+  const svg = Buffer.from(`
+    <svg width="2500" height="1686" xmlns="http://www.w3.org/2000/svg">
+      <rect width="2500" height="1686" fill="#FFF8E7"/>
+      <rect x="40" y="20" width="750" height="800" fill="#E65100" rx="16"/>
+      <text x="415" y="460" fill="white" font-size="48" font-weight="bold" text-anchor="middle" font-family="sans-serif">เมนู</text>
+      <rect x="870" y="20" width="760" height="800" fill="#9C4A35" rx="16"/>
+      <text x="1250" y="460" fill="white" font-size="48" font-weight="bold" text-anchor="middle" font-family="sans-serif">ช่วยเหลือ</text>
+      <rect x="1700" y="20" width="760" height="800" fill="#E65100" rx="16"/>
+      <text x="2080" y="460" fill="white" font-size="48" font-weight="bold" text-anchor="middle" font-family="sans-serif">สถานะ</text>
+      <rect x="40" y="860" width="1180" height="800" fill="#9C4A35" rx="16"/>
+      <text x="630" y="1300" fill="white" font-size="56" font-weight="bold" text-anchor="middle" font-family="sans-serif">ผูกเบอร์โทร</text>
+      <rect x="1260" y="860" width="1200" height="800" fill="#E65100" rx="16"/>
+      <text x="1860" y="1300" fill="white" font-size="56" font-weight="bold" text-anchor="middle" font-family="sans-serif">เปิดเว็บ</text>
+    </svg>
+  `)
+
+  return sharp(svg)
+    .resize(2500, 1686)
+    .png()
+    .toBuffer()
+}
+
+async function main() {
+  const headers = await getHeaders()
+
+  await deleteExistingRichMenus(headers)
+
   const richMenu = {
     size: { width: 2500, height: 1686 },
     selected: true,
@@ -61,41 +104,24 @@ async function main() {
   const { richMenuId } = await createRes.json()
   console.log(`✅ สร้าง Rich Menu สำเร็จ: ${richMenuId}`)
 
-  // 2. Upload image (use logo.png from public/)
-  const fs = await import('fs')
-  const path = await import('path')
-  const imagePath = path.resolve('public/logo.png')
+  const imageBuffer = await generateImage()
+  const uploadRes = await fetch(`${LINE_DATA_API}/richmenu/${richMenuId}/content`, {
+    method: 'POST',
+    headers: {
+      'Authorization': headers['Authorization'],
+      'Content-Type': 'image/png',
+    },
+    body: imageBuffer,
+  })
 
-  if (fs.existsSync(imagePath)) {
-    const imageBuffer = fs.readFileSync(imagePath)
-
-    // LINE requires image to be JPEG or PNG, max 1MB, 2500x1686
-    const uploadRes = await fetch(`${LINE_API}/richmenu/${richMenuId}/content`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'image/png',
-      },
-      body: imageBuffer,
-    })
-
-    if (!uploadRes.ok) {
-      const err = await uploadRes.text()
-      console.error('❌ อัปโหลดรูป Rich Menu ไม่สำเร็จ:', err)
-      console.log('ℹ️  รูป logo.png อาจไม่เหมาะกับขนาด 2500x1686 px')
-      console.log('   คุณสามารถอัปโหลดรูปเองได้ที่ LINE Developer Console')
-      process.exit(1)
-    }
-
-    console.log('✅ อัปโหลดรูป Rich Menu สำเร็จ')
-  } else {
-    console.warn('⚠️  ไม่พบ public/logo.png — ข้ามอัปโหลดรูป')
-    console.log(`   รหัส Rich Menu: ${richMenuId}`)
-    console.log('   อัปโหลดรูปที่ LINE Developer Console:')
-    console.log(`   POST ${LINE_API}/richmenu/${richMenuId}/content`)
+  if (!uploadRes.ok) {
+    const err = await uploadRes.text()
+    console.error('❌ อัปโหลดรูป Rich Menu ไม่สำเร็จ:', err)
+    process.exit(1)
   }
 
-  // 3. Set as default
+  console.log('✅ อัปโหลดรูป Rich Menu สำเร็จ')
+
   const setRes = await fetch(`${LINE_API}/user/all/richmenu/${richMenuId}`, {
     method: 'POST',
     headers,

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { generateOtp } from '@/lib/auth'
 import { pushMessage } from '@/lib/line'
+import { rateLimit, getIp } from '@/lib/rate-limit'
+import { validate, sendOtpSchema } from '@/lib/validations'
 
 const RATE_LIMIT_MS = 60_000
 
@@ -18,11 +20,19 @@ async function getLineUserId(phone: string): Promise<string | null> {
 }
 
 export async function POST(request: Request) {
-  const { phone } = await request.json()
-
-  if (!phone || phone.length < 10) {
-    return NextResponse.json({ error: 'กรุณากรอกเบอร์โทรให้ถูกต้อง' }, { status: 400 })
+  const ip = getIp(request)
+  const rl = rateLimit(`send-otp:${ip}`, { maxRequests: 20, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'โหลดเยอะเกินไป กรุณาลองใหม่ภายหลัง' }, {
+      status: 429,
+      headers: { 'Retry-After': String(rl.retryAfter) }
+    })
   }
+
+  const body = await request.json()
+  const validated = validate(sendOtpSchema, body)
+  if (validated.error) return validated.error
+  const { phone } = validated.data!
 
   const { data: existing } = await supabase
     .from('otps')

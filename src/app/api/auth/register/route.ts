@@ -1,18 +1,24 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { createSession, getSessionCookieHeaders } from '@/lib/auth'
+import { rateLimit, getIp } from '@/lib/rate-limit'
+import { validate, registerSchema } from '@/lib/validations'
 
 export async function POST(request: Request) {
+  const ip = getIp(request)
+  const rl = rateLimit(`register:${ip}`, { maxRequests: 5, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'โหลดเยอะเกินไป กรุณาลองใหม่ภายหลัง' }, {
+      status: 429,
+      headers: { 'Retry-After': String(rl.retryAfter) }
+    })
+  }
+
   const body = await request.json()
-  const { phone, otp, role } = body
-
-  if (!phone || !otp || !role) {
-    return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, { status: 400 })
-  }
-
-  if (role !== 'merchant' && role !== 'rider') {
-    return NextResponse.json({ error: 'บทบาทไม่ถูกต้อง' }, { status: 400 })
-  }
+  const validated = validate(registerSchema, body)
+  if (validated.error) return validated.error
+  const { phone, otp, role } = validated.data!
+  const v = validated.data as { phone: string; otp: string; role: 'merchant' | 'rider'; name?: string }
 
   // Verify OTP
   const { data: otpData } = await supabase
@@ -52,10 +58,6 @@ export async function POST(request: Request) {
   let userType: 'merchant' | 'rider' = role
 
   if (role === 'merchant') {
-    const { name } = body
-    if (!name) {
-      return NextResponse.json({ error: 'กรุณากรอกชื่อร้าน' }, { status: 400 })
-    }
     // Generate next store ID
     const { data: maxStore } = await supabase
       .from('stores')
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
       .from('stores')
       .insert({
         id: storeId,
-        name,
+        name: v.name!,
         phone,
         status: 'closed',
         wait_time: 20,
@@ -83,15 +85,12 @@ export async function POST(request: Request) {
     }
     userId = store.id
   } else {
-    const { name, zone_id } = body
-    if (!name) {
-      return NextResponse.json({ error: 'กรุณากรอกชื่อ' }, { status: 400 })
-    }
+    const { zone_id } = body
 
     const { data: rider, error } = await supabase
       .from('riders')
       .insert({
-        name,
+        name: v.name!,
         phone,
         zone_id: zone_id || null,
         earnings: 0,

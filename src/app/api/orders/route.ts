@@ -3,90 +3,76 @@ import { supabase } from '@/lib/supabase'
 import { pushMessage, textMessage } from '@/lib/line'
 import { withAuth } from '@/lib/api-utils'
 import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { validate, createOrderSchema } from '@/lib/validations'
 
 export const POST = withAuth(async (request: Request, session) => {
+  const limit = checkRateLimit(`order:${session.user_id}`, { maxRequests: 10, windowMs: 60_000 })
+  if (limit) return limit
+
   const body = await request.json()
-  const { store_id, items, delivery_fee, lat, lng, address, note, payment_method } = body
+  const validated = validate(createOrderSchema, body)
+  if (validated.error) return validated.error
 
-  if (!store_id || !items || items.length === 0) {
-    return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 })
-  }
-  const customer_id = session.user_id
+  const { store_id, items, delivery_fee, lat, lng, address, note, payment_method, idempotency_key } = validated.data!
 
-  const menuIds = items.map((i: { menu_id: string }) => i.menu_id)
-  const { data: menuItems } = await supabase
-    .from('menu_items')
-    .select('id, name, price, stock')
-    .in('id', menuIds)
+  if (idempotency_key) {
+    const { data: existing } = await supabase
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .eq('idempotency_key', idempotency_key)
+      .single()
 
-  const menuMap = new Map(menuItems?.map(m => [m.id, m]) || [])
-
-  for (const item of items) {
-    const dbItem = menuMap.get(item.menu_id)
-    if (!dbItem) {
-      return NextResponse.json({ error: `ไม่พบเมนู ${item.name}` }, { status: 400 })
-    }
-    if (dbItem.stock !== null && dbItem.stock !== undefined && dbItem.stock < item.qty) {
-      return NextResponse.json({ error: `${dbItem.name} คงเหลือไม่เพียงพอ (เหลือ ${dbItem.stock})` }, { status: 400 })
+    if (existing) {
+      return NextResponse.json(existing, { status: 200 })
     }
   }
 
   const df = delivery_fee ?? DEFAULT_DELIVERY_FEE
-  const foodTotal = items.reduce((sum: number, item: { price: number; qty: number }) =>
-    sum + item.price * item.qty, 0
-  )
-  const total = foodTotal + df
 
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      customer_id,
-      store_id,
-      total,
-      delivery_fee: df,
-      lat,
-      lng,
-      address,
-      note,
-      payment_method: payment_method || 'cash',
-      status: 'รอดำเนินการ',
-    })
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('place_order', {
+    p_customer_id: session.user_id,
+    p_store_id: store_id,
+    p_items: items.map((i: { menu_id: string; name: string; price: number; qty: number }) => ({
+      menu_id: i.menu_id,
+      name: i.name,
+      price: i.price,
+      qty: i.qty,
+    })),
+    p_delivery_fee: df,
+    p_lat: lat ?? null,
+    p_lng: lng ?? null,
+    p_address: address ?? null,
+    p_note: note ?? null,
+    p_payment_method: payment_method || 'cash',
+  })
 
-  if (orderError) return NextResponse.json({ error: orderError.message }, { status: 500 })
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
-  const orderItems = items.map((item: { menu_id: string; name: string; price: number; qty: number }) => ({
-    order_id: order.id,
-    menu_id: item.menu_id,
-    name: item.name,
-    price: item.price,
-    qty: item.qty,
-  }))
+  if (data.ok === false) {
+    return NextResponse.json({ error: data.error }, { status: 400 })
+  }
 
-  const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
-  if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 })
+  const order = data.order
 
-  for (const item of items) {
-    const dbItem = menuMap.get(item.menu_id)
-    if (dbItem?.stock !== null && dbItem?.stock !== undefined) {
-      await supabase
-        .from('menu_items')
-        .update({ stock: dbItem.stock - item.qty })
-        .eq('id', item.menu_id)
-    }
+  if (idempotency_key) {
+    await supabase.from('orders').update({ idempotency_key }).eq('id', order.id)
   }
 
   if (process.env.LINE_USER_ID) {
-    const itemsText = orderItems.map((i: { name: string; price: number; qty: number }) => `  ${i.qty}x ${i.name}  ${i.price * i.qty} บาท`).join('\n')
+    const itemsText = order.items.map((i: { name: string; price: number; qty: number }) =>
+      `  ${i.qty}x ${i.name}  ${i.price * i.qty} บาท`
+    ).join('\n')
     pushMessage(process.env.LINE_USER_ID, [
       textMessage(
-        `🆕 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n${itemsText}\n━━━━━━━━━━━━━━\n💵 รวม: ${total} บาท\n📍 ${address || 'ไม่ระบุ'}\n📝 ${note || '-'}\n━━━━━━━━━━━━━━\n#${order.id.slice(0, 8)}`
+        `🆕 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n${itemsText}\n━━━━━━━━━━━━━━\n💵 รวม: ${order.total} บาท\n📍 ${order.address || 'ไม่ระบุ'}\n📝 ${order.note || '-'}\n━━━━━━━━━━━━━━\n#${order.id.slice(0, 8)}`
       ),
     ])
   }
 
-  return NextResponse.json({ ...order, items: orderItems }, { status: 201 })
+  return NextResponse.json(order, { status: 201 })
 }, ['customer'])
 
 export const GET = withAuth(async (request: Request, session) => {

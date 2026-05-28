@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const BUCKET = 'food-images'
 
@@ -19,7 +20,10 @@ async function ensureBucket() {
   _bucketEnsured = true
 }
 
-export const POST = withAuth(async (request: Request) => {
+export const POST = withAuth(async (request: Request, session) => {
+  const limit = checkRateLimit(`upload:${session.user_id}`, { maxRequests: 5, windowMs: 60_000 })
+  if (limit) return limit
+
   const formData = await request.formData()
   const file = formData.get('file') as File | null
 

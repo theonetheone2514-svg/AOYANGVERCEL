@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { withAuth } from '@/lib/api-utils'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const POST = withAuth(async (request: Request, session) => {
+  const limit = checkRateLimit(`link:${session.user_id}`, { maxRequests: 10, windowMs: 60_000 })
+  if (limit) return limit
+
   const body = await request.json()
   const { line_user_id } = body
 

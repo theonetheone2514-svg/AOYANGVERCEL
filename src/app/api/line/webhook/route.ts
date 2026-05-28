@@ -5,6 +5,7 @@ import {
   storeListFlex, menuFlex, cartFlex, helpMessage,
 } from '@/lib/line'
 import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
+import { rateLimit, getIp } from '@/lib/rate-limit'
 
 async function getUserState(lineUserId: string) {
   const { data } = await supabase
@@ -32,6 +33,12 @@ async function findUserByLineId(lineUserId: string) {
 }
 
 export async function POST(request: Request) {
+  const ip = getIp(request)
+  const rl = rateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 })
+  }
+
   const body = await request.json()
   const events = body.events || []
 
