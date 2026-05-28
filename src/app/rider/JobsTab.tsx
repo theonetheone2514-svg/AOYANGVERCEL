@@ -6,6 +6,7 @@ import { formatPrice, getElapsedMinutes } from '@/lib/utils'
 import { showOrderToast } from '@/components/Toast'
 import EmptyState from '@/components/EmptyState'
 import LoadingSpinner from '@/components/LoadingSpinner'
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 
 interface Props {
   rider: any
@@ -58,20 +59,65 @@ export default function JobsTab({ rider, onUpdate }: Props) {
 
   useEffect(() => {
     loadJobs()
-    const interval = setInterval(loadJobs, 15000)
-    return () => clearInterval(interval)
-  }, [loadJobs])
+
+    // Backup polling every 30s
+    const pollInterval = setInterval(loadJobs, 30000)
+
+    // Realtime: new available jobs
+    const availableChannel = supabase
+      .channel('rider-available')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+          filter: 'status=eq.พร้อมจัดส่ง',
+        },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          loadJobs()
+        }
+      )
+      .subscribe()
+
+    // Realtime: my active job updates
+    const activeChannel = rider?.id
+      ? supabase
+          .channel(`rider-active-${rider.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'orders',
+              filter: `rider_id=eq.${rider.id}`,
+            },
+            (payload: RealtimePostgresChangesPayload<any>) => {
+              const updated = payload.new as any
+              setActive((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)))
+              loadJobs()
+            }
+          )
+          .subscribe()
+      : null
+
+    return () => {
+      clearInterval(pollInterval)
+      supabase.removeChannel(availableChannel)
+      if (activeChannel) supabase.removeChannel(activeChannel)
+    }
+  }, [loadJobs, rider?.id])
 
   async function acceptJob(orderId: string) {
-    const { data } = await supabase
+    const { data: order } = await supabase
       .from('orders')
       .update({ rider_id: rider.id, status: 'กำลังจัดส่ง' })
       .eq('id', orderId)
       .is('rider_id', null)
-      .select()
+      .select('*, items:order_items(*), stores(name), customers(name, phone)')
       .single()
 
-    if (!data) {
+    if (!order) {
       alert('⚠️ ออเดอร์นี้มีไรเดอร์รับไปแล้ว')
       loadJobs()
       return
@@ -79,6 +125,22 @@ export default function JobsTab({ rider, onUpdate }: Props) {
 
     await supabase.from('riders').update({ online: true }).eq('id', rider.id)
     onUpdate({ ...rider, online: true })
+
+    // LINE push to admin
+    const items = ((order as any)?.items || []).map((i: any) => `${i.qty}x ${i.name}`).join(', ')
+    await fetch('/api/line/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'rider_accepted',
+        store_name: order.stores?.name || 'ไม่ทราบร้าน',
+        customer_name: order.customers?.name || 'ไม่ทราบชื่อ',
+        customer_phone: order.customers?.phone || '',
+        items: items,
+        total: order.total,
+      }),
+    }).catch(() => {})
+
     loadJobs()
   }
 

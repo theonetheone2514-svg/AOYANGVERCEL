@@ -32,6 +32,7 @@ export default function Home() {
   const [cart, setCart] = useState<Map<string, { item: MenuItem; qty: number }>>(new Map())
   const [showCart, setShowCart] = useState(false)
   const [zones, setZones] = useState<Zone[]>([])
+  const [storeRatings, setStoreRatings] = useState<Record<string, { average: number; count: number }>>({})
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
@@ -74,6 +75,23 @@ export default function Home() {
     setLoadingStores(true)
     const { data } = await supabase.from('stores').select('*').order('name')
     if (data) setStores(data)
+
+    // Fetch ratings for all stores
+    const { data: allRatings } = await supabase.from('ratings').select('store_id, rating')
+    if (allRatings) {
+      const map: Record<string, { total: number; count: number }> = {}
+      for (const r of allRatings) {
+        if (!map[r.store_id]) map[r.store_id] = { total: 0, count: 0 }
+        map[r.store_id].total += r.rating
+        map[r.store_id].count += 1
+      }
+      const avgMap: Record<string, { average: number; count: number }> = {}
+      for (const [id, v] of Object.entries(map)) {
+        avgMap[id] = { average: Math.round((v.total / v.count) * 10) / 10, count: v.count }
+      }
+      setStoreRatings(avgMap)
+    }
+
     setLoadingStores(false)
   }
 
@@ -347,6 +365,8 @@ export default function Home() {
                   store={store}
                   selected={selectedStore?.id === store.id}
                   onSelect={selectStore}
+                  rating={storeRatings[store.id]?.average}
+                  ratingCount={storeRatings[store.id]?.count}
                 />
               ))}
             </div>

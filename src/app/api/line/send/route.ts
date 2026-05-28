@@ -12,6 +12,10 @@ function formatStatusUpdate(body: any): string {
   return `📋 ออเดอร์ ${body.order_id}\nสถานะ: ${body.status}`
 }
 
+function formatRiderAccepted(body: any): string {
+  return `🛵 ไรเดอร์รับงานแล้ว!\n━━━━━━━━━━━━━━\n🏪 ร้าน: ${body.store_name}\n👤 ลูกค้า: ${body.customer_name} ${body.customer_phone ? `(${body.customer_phone})` : ''}\n📝 รายการ: ${body.items}\n💰 รวม: ${body.total} บาท\n━━━━━━━━━━━━━━\n#เอาหยังบ่`
+}
+
 export async function POST(request: Request) {
   const body = await request.json()
   const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
@@ -26,6 +30,8 @@ export async function POST(request: Request) {
     text = formatNewOrder(body)
   } else if (body.type === 'status_update') {
     text = formatStatusUpdate(body)
+  } else if (body.type === 'rider_accepted') {
+    text = formatRiderAccepted(body)
   } else {
     text = body.text || ''
   }

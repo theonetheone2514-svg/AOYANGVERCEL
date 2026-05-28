@@ -129,3 +129,13 @@ export interface DashboardSummary {
   orders_by_status: { status: string; count: number }[]
   revenue_by_day: { date: string; revenue: number }[]
 }
+
+export interface Rating {
+  id: string
+  order_id: string
+  customer_id: string
+  store_id: string
+  rating: number
+  review?: string
+  created_at: string
+}

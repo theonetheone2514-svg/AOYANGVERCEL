@@ -8,6 +8,9 @@ import type { Order, OrderItem } from '@/lib/types'
 import { getStatusColor, formatPrice, getElapsedMinutes } from '@/lib/utils'
 import { ChevronLeft, Clock } from 'lucide-react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+
+const RatingModal = dynamic(() => import('@/components/RatingModal'), { ssr: false })
 
 const statusTabs = ['ทั้งหมด', 'รอดำเนินการ', 'กำลังจัดส่ง', 'จัดส่งสำเร็จ', 'ยกเลิก']
 
@@ -23,6 +26,9 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ทั้งหมด')
+  const [customerId, setCustomerId] = useState<string | null>(null)
+  const [ratingOrder, setRatingOrder] = useState<OrderWithItems | null>(null)
+  const [ratedOrderIds, setRatedOrderIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (authLoading) return
@@ -37,6 +43,7 @@ export default function OrdersPage() {
       .eq('phone', user!.phone)
       .maybeSingle()
     if (!cust) { setLoading(false); return }
+    setCustomerId(cust.id)
 
     const { data } = await supabase
       .from('orders')
@@ -45,6 +52,16 @@ export default function OrdersPage() {
       .order('created_at', { ascending: false })
 
     setOrders((data || []) as unknown as OrderWithItems[])
+
+    // Check which orders already have ratings
+    const { data: ratings } = await supabase
+      .from('ratings')
+      .select('order_id')
+      .eq('customer_id', cust.id)
+    if (ratings) {
+      setRatedOrderIds(new Set(ratings.map((r) => r.order_id)))
+    }
+
     setLoading(false)
   }
 
@@ -106,6 +123,8 @@ export default function OrdersPage() {
         ) : (
           filtered.map((order) => {
             const elapsed = getElapsedMinutes(order.created_at)
+            const isComplete = order.status === 'จัดส่งสำเร็จ'
+            const canRate = isComplete && customerId && !ratedOrderIds.has(order.id)
             return (
               <div key={order.id} className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
                 {/* Header */}
@@ -137,13 +156,39 @@ export default function OrdersPage() {
                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {elapsed} นาที</span>
                     <span>{getPaymentLabel(order.payment_method)}</span>
                   </div>
-                  <span className="font-semibold text-[#E65100] text-sm">{formatPrice(Number(order.total))}</span>
+                  <div className="flex items-center gap-2">
+                    {canRate && (
+                      <button
+                        onClick={() => setRatingOrder(order)}
+                        className="text-yellow-600 font-medium hover:text-yellow-700 transition"
+                      >
+                        ⭐ ให้คะแนน
+                      </button>
+                    )}
+                    {isComplete && ratedOrderIds.has(order.id) && (
+                      <span className="text-yellow-500">⭐</span>
+                    )}
+                    <span className="font-semibold text-[#E65100] text-sm">{formatPrice(Number(order.total))}</span>
+                  </div>
                 </div>
               </div>
             )
           })
         )}
       </main>
+
+      {ratingOrder && customerId && (
+        <RatingModal
+          orderId={ratingOrder.id}
+          storeId={ratingOrder.store_id}
+          customerId={customerId}
+          onClose={() => setRatingOrder(null)}
+          onDone={() => {
+            setRatedOrderIds((prev) => new Set(prev).add(ratingOrder.id))
+            setRatingOrder(null)
+          }}
+        />
+      )}
     </div>
   )
 }

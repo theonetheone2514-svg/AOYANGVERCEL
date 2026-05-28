@@ -19,9 +19,11 @@ interface StoreCardProps {
   store: Store
   selected: boolean
   onSelect: (store: Store) => void
+  rating?: number
+  ratingCount?: number
 }
 
-export default function StoreCard({ store, selected, onSelect }: StoreCardProps) {
+export default function StoreCard({ store, selected, onSelect, rating, ratingCount }: StoreCardProps) {
   const icon = storeIcons[store.id] || '🏪'
   const gradient = storeGradients[store.id] || 'from-gray-400 to-gray-500'
   const [imgError, setImgError] = useState(false)
@@ -63,6 +65,9 @@ export default function StoreCard({ store, selected, onSelect }: StoreCardProps)
         {/* Store name overlay */}
         <div className="absolute bottom-2.5 left-3 right-3">
           <h3 className="text-white font-bold text-sm drop-shadow-md truncate">{store.name}</h3>
+          {rating !== undefined && ratingCount !== undefined && ratingCount > 0 && (
+            <p className="text-yellow-300 text-xs drop-shadow-sm">⭐ {rating} ({ratingCount})</p>
+          )}
         </div>
       </div>
       <div className="px-3 py-2.5 flex items-center justify-between">

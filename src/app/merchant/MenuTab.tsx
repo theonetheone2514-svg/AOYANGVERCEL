@@ -24,6 +24,7 @@ export default function MenuTab({ storeId }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({ name: '', price: '', category: '', stock: 99, image_url: '' })
 
   const load = useCallback(async () => {
@@ -169,27 +170,55 @@ export default function MenuTab({ storeId }: Props) {
               +
             </button>
           </div>
-          <input
-            placeholder="URL รูปอาหาร (ไม่บังคับ)"
-            value={form.image_url}
-            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#E65100]"
-          />
-          {form.image_url && (
-            <div className="h-24 rounded-lg overflow-hidden bg-gray-100">
-              <img src={form.image_url} alt="preview" className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block' }}
+          {/* Image upload */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">รูปอาหาร (ไม่บังคับ)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const fd = new FormData()
+                  fd.append('file', file)
+                  setUploading(true)
+                  try {
+                    const res = await fetch('/api/upload', { method: 'POST', body: fd })
+                    const data = await res.json()
+                    if (data.url) setForm({ ...form, image_url: data.url })
+                  } catch {
+                    alert('อัปโหลดรูปไม่สำเร็จ')
+                  }
+                  setUploading(false)
+                }}
+                className="flex-1 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-orange-50 file:text-[#E65100] hover:file:bg-orange-100 cursor-pointer"
               />
+              {form.image_url && (
+                <button
+                  onClick={() => setForm({ ...form, image_url: '' })}
+                  className="text-xs text-red-500 hover:text-red-700 shrink-0"
+                >
+                  ลบรูป
+                </button>
+              )}
             </div>
-          )}
+            {form.image_url && (
+              <div className="h-24 rounded-lg overflow-hidden bg-gray-100 mt-2">
+                <img src={form.image_url} alt="preview" className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block' }}
+                />
+              </div>
+            )}
+          </div>
           <div className="flex gap-2">
             <button
               onClick={editId ? saveEdit : addItem}
-              disabled={!form.name || !form.price}
+              disabled={!form.name || !form.price || uploading}
               className="flex-1 bg-[#E65100] text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 hover:bg-[#d44900] transition"
             >
-              {editId ? 'บันทึก' : 'เพิ่มเมนู'}
+              {uploading ? 'กำลังอัปโหลด...' : editId ? 'บันทึก' : 'เพิ่มเมนู'}
             </button>
             <button
               onClick={resetForm}
