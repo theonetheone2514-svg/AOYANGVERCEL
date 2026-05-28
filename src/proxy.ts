@@ -20,7 +20,7 @@ const roleAccess: Record<string, string[]> = {
   '/dashboard': ['admin', 'merchant'],
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isPublic = publicPaths.some((p) => pathname === p || pathname.startsWith(p + '/')) ||
