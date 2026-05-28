@@ -4,12 +4,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice, calculateCommission, netAfterCommission } from '@/lib/utils'
 import LoadingSpinner from '@/components/LoadingSpinner'
+import { DEFAULT_COMMISSION_RATE } from '@/lib/constants'
 
 interface Props {
   storeId: string
 }
-
-const COMMISSION_RATE = 0.15
 
 export default function StatementTab({ storeId }: Props) {
   const [orders, setOrders] = useState<any[]>([])
@@ -38,8 +37,8 @@ export default function StatementTab({ storeId }: Props) {
     return s + food
   }, 0)
   const deliveryTotal = completed.reduce((s, o) => s + Number(o.delivery_fee || 10), 0)
-  const commission = calculateCommission(foodTotal, COMMISSION_RATE)
-  const netIncome = netAfterCommission(foodTotal, deliveryTotal, COMMISSION_RATE)
+  const commission = calculateCommission(foodTotal, DEFAULT_COMMISSION_RATE)
+  const netIncome = netAfterCommission(foodTotal, deliveryTotal, DEFAULT_COMMISSION_RATE)
 
   const periods = [
     { label: 'วันนี้', days: 1 },

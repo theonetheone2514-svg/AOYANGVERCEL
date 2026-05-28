@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { withAuth } from '@/lib/api-utils'
 
-export async function GET() {
+export const GET = withAuth(async () => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todayStr = today.toISOString()
@@ -45,4 +46,4 @@ export async function GET() {
     orders_by_status: Object.entries(statusCounts).map(([status, count]) => ({ status, count })),
     revenue_by_day: Object.entries(revenueByDayMap).map(([date, revenue]) => ({ date, revenue })),
   })
-}
+}, ['admin'])

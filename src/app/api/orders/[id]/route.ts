@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { pushMessage, textMessage } from '@/lib/line'
+import { withAuth } from '@/lib/api-utils'
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export const PATCH = withAuth(async (request: Request, session, params) => {
+  const { id } = params!
   const body = await request.json()
 
   const { data, error } = await supabase
     .from('orders').update(body).eq('id', id).select('*, items:order_items(*)').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // LINE push on status change
   if (body.status && process.env.LINE_USER_ID) {
     const itemsText = (data.items || []).map((i: any) => `  ${i.qty}x ${i.name}`).join('\n')
     const statusEmoji: Record<string, string> = {
@@ -25,14 +25,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json(data)
-}
+}, ['merchant', 'rider', 'admin'])
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export const GET = withAuth(async (request: Request, session, params) => {
+  const { id } = params!
 
   const { data, error } = await supabase
     .from('orders').select('*, items:order_items(*)').eq('id', id).single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'ไม่พบออเดอร์' }, { status: 404 })
   return NextResponse.json(data)
-}
+})

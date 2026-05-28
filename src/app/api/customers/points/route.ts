@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { withAuth } from '@/lib/api-utils'
 
-export async function PATCH(request: Request) {
+export const PATCH = withAuth(async (request: Request) => {
   const body = await request.json()
   const { customer_id, points } = body
 
@@ -13,4 +14,4 @@ export async function PATCH(request: Request) {
     .from('customers').update({ points }).eq('id', customer_id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
-}
+})

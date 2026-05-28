@@ -1,19 +1,41 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { pushMessage, textMessage } from '@/lib/line'
+import { withAuth } from '@/lib/api-utils'
+import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
 
-export async function POST(request: Request) {
+export const POST = withAuth(async (request: Request, session) => {
   const body = await request.json()
-  const { customer_id, store_id, items, delivery_fee, lat, lng, address, note, payment_method } = body
+  const { store_id, items, delivery_fee, lat, lng, address, note, payment_method } = body
 
-  if (!customer_id || !store_id || !items || items.length === 0) {
+  if (!store_id || !items || items.length === 0) {
     return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 })
   }
+  const customer_id = session.user_id
 
+  const menuIds = items.map((i: { menu_id: string }) => i.menu_id)
+  const { data: menuItems } = await supabase
+    .from('menu_items')
+    .select('id, name, price, stock')
+    .in('id', menuIds)
+
+  const menuMap = new Map(menuItems?.map(m => [m.id, m]) || [])
+
+  for (const item of items) {
+    const dbItem = menuMap.get(item.menu_id)
+    if (!dbItem) {
+      return NextResponse.json({ error: `ไม่พบเมนู ${item.name}` }, { status: 400 })
+    }
+    if (dbItem.stock !== null && dbItem.stock !== undefined && dbItem.stock < item.qty) {
+      return NextResponse.json({ error: `${dbItem.name} คงเหลือไม่เพียงพอ (เหลือ ${dbItem.stock})` }, { status: 400 })
+    }
+  }
+
+  const df = delivery_fee ?? DEFAULT_DELIVERY_FEE
   const foodTotal = items.reduce((sum: number, item: { price: number; qty: number }) =>
     sum + item.price * item.qty, 0
   )
-  const total = foodTotal + (delivery_fee || 10)
+  const total = foodTotal + df
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
@@ -21,7 +43,7 @@ export async function POST(request: Request) {
       customer_id,
       store_id,
       total,
-      delivery_fee: delivery_fee || 10,
+      delivery_fee: df,
       lat,
       lng,
       address,
@@ -45,7 +67,16 @@ export async function POST(request: Request) {
   const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
   if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 })
 
-  // LINE push to merchant
+  for (const item of items) {
+    const dbItem = menuMap.get(item.menu_id)
+    if (dbItem?.stock !== null && dbItem?.stock !== undefined) {
+      await supabase
+        .from('menu_items')
+        .update({ stock: dbItem.stock - item.qty })
+        .eq('id', item.menu_id)
+    }
+  }
+
   if (process.env.LINE_USER_ID) {
     const itemsText = orderItems.map((i: { name: string; price: number; qty: number }) => `  ${i.qty}x ${i.name}  ${i.price * i.qty} บาท`).join('\n')
     pushMessage(process.env.LINE_USER_ID, [
@@ -56,9 +87,9 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ...order, items: orderItems }, { status: 201 })
-}
+}, ['customer'])
 
-export async function GET(request: Request) {
+export const GET = withAuth(async (request: Request, session) => {
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get('store_id')
   const customerId = searchParams.get('customer_id')
@@ -74,7 +105,18 @@ export async function GET(request: Request) {
   if (status) query = query.eq('status', status)
   if (zoneId) query = query.eq('zone_id', zoneId)
 
+  if (session.user_type === 'admin') {
+  } else if (session.user_type === 'merchant') {
+    const { data: stores } = await supabase.from('stores').select('id').eq('phone', session.phone)
+    const storeIds = stores?.map(s => s.id) || []
+    query = query.in('store_id', storeIds)
+  } else if (session.user_type === 'rider') {
+    query = query.eq('rider_id', session.user_id)
+  } else {
+    query = query.eq('customer_id', session.user_id)
+  }
+
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
-}
+})

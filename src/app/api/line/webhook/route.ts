@@ -4,6 +4,7 @@ import {
   replyMessage, pushMessage, textMessage,
   storeListFlex, menuFlex, cartFlex, helpMessage,
 } from '@/lib/line'
+import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
 
 async function getUserState(lineUserId: string) {
   const { data } = await supabase
@@ -148,11 +149,11 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
     const total = cart.reduce((sum: number, c: any) => sum + c.price * c.qty, 0)
 
     const { data: order, error } = await supabase
-      .from('orders').insert({
+      .from('orders')      .insert({
         customer_id: customer.id,
         store_id: storeId,
-        total: total + 10,
-        delivery_fee: 10,
+        total: total + DEFAULT_DELIVERY_FEE,
+        delivery_fee: DEFAULT_DELIVERY_FEE,
         status: 'รอดำเนินการ',
       }).select().single()
 

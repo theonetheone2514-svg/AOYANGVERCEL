@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { withAuth } from '@/lib/api-utils'
 
 const BUCKET = 'food-images'
 
@@ -18,7 +19,7 @@ async function ensureBucket() {
   _bucketEnsured = true
 }
 
-export async function POST(request: Request) {
+export const POST = withAuth(async (request: Request) => {
   const formData = await request.formData()
   const file = formData.get('file') as File | null
 
@@ -59,4 +60,4 @@ export async function POST(request: Request) {
     .getPublicUrl(data.path)
 
   return NextResponse.json({ url: publicUrl })
-}
+}, ['merchant', 'admin'])

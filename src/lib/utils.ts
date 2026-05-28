@@ -9,11 +9,11 @@ export function formatPrice(amount: number): string {
   return `${amount.toFixed(2)} บาท`
 }
 
-export function calculateCommission(foodTotal: number, rate: number = 0.15): number {
+export function calculateCommission(foodTotal: number, rate: number): number {
   return Math.round(foodTotal * rate * 100) / 100
 }
 
-export function netAfterCommission(foodTotal: number, deliveryFee: number, rate: number = 0.15): number {
+export function netAfterCommission(foodTotal: number, deliveryFee: number, rate: number): number {
   return foodTotal - calculateCommission(foodTotal, rate) + deliveryFee
 }
 

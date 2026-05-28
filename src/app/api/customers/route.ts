@@ -1,33 +1,30 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { withAuth } from '@/lib/api-utils'
 
-export async function GET(request: Request) {
+export const GET = withAuth(async (request: Request, session) => {
   const { searchParams } = new URL(request.url)
-  const phone = searchParams.get('phone')
-  const id = searchParams.get('id')
+  const sessionId = session.user_id
 
-  let data: unknown
-  let error: unknown
+  const requestedId = searchParams.get('id')
 
-  if (phone) {
-    const result = await supabase.from('customers').select('*').eq('phone', phone).single()
-    data = result.data
-    error = result.error
-  } else if (id) {
-    const result = await supabase.from('customers').select('*').eq('id', id).single()
-    data = result.data
-    error = result.error
-  } else {
-    const result = await supabase.from('customers').select('*').order('created_at', { ascending: false })
-    data = result.data
-    error = result.error
+  if (requestedId && requestedId !== sessionId && session.user_type !== 'admin') {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
   }
 
-  if (error) return NextResponse.json({ error }, { status: 500 })
-  return NextResponse.json(data)
-}
+  const query = supabase.from('customers').select('*')
+  if (requestedId) {
+    query.eq('id', requestedId)
+  } else {
+    query.eq('id', sessionId)
+  }
 
-export async function POST(request: Request) {
+  const { data, error } = await query.single()
+  if (error) return NextResponse.json({ error: 'ไม่พบข้อมูล' }, { status: 404 })
+  return NextResponse.json(data)
+})
+
+export const POST = withAuth(async (request: Request) => {
   const body = await request.json()
   const { phone, name } = body
 
@@ -40,4 +37,4 @@ export async function POST(request: Request) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
-}
+})

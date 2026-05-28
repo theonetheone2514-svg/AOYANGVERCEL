@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**",
+        hostname: process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '') || '**.supabase.co',
       },
     ],
   },
@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
           { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
     ]

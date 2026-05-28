@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { createSession, getSessionCookieHeaders } from '@/lib/auth'
+import { ADMIN_PHONES } from '@/lib/constants'
 
 export async function POST(request: Request) {
   const { phone, otp } = await request.json()
@@ -69,8 +70,7 @@ export async function POST(request: Request) {
   }
 
   // Admin override (takes priority)
-  const adminPhones = ['0929892085']
-  if (adminPhones.includes(phone)) {
+  if (ADMIN_PHONES.includes(phone)) {
     userType = 'admin'
     userId = 'admin001'
   }

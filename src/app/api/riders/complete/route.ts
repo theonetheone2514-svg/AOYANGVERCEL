@@ -1,18 +1,24 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { withAuth } from '@/lib/api-utils'
 
-export async function POST(request: Request) {
+export const POST = withAuth(async (request: Request, session) => {
   const body = await request.json()
-  const { rider_id, order_id } = body
+  const { order_id } = body
+  const rider_id = session.user_id
 
-  if (!rider_id || !order_id) {
+  if (!order_id) {
     return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 })
   }
 
   const { data: order } = await supabase
-    .from('orders').select('delivery_fee, total, customer_id').eq('id', order_id).single()
+    .from('orders').select('rider_id, delivery_fee, total, customer_id, status').eq('id', order_id).single()
 
-  const deliveryFee = order?.delivery_fee || 0
+  if (!order) return NextResponse.json({ error: 'ไม่พบออเดอร์' }, { status: 404 })
+  if (order.rider_id !== rider_id) return NextResponse.json({ error: 'ไม่ใช่งานของคุณ' }, { status: 403 })
+  if (order.status === 'จัดส่งสำเร็จ') return NextResponse.json({ error: 'งานนี้เสร็จสิ้นแล้ว' }, { status: 409 })
+
+  const deliveryFee = order.delivery_fee || 0
 
   const { data: currentRider } = await supabase
     .from('riders').select('earnings, jobs_count').eq('id', rider_id).single()
@@ -30,7 +36,6 @@ export async function POST(request: Request) {
   const { data: updatedOrder } = await supabase
     .from('orders').update({ status: 'จัดส่งสำเร็จ' }).eq('id', order_id).select().single()
 
-  // Award loyalty points (1 point per 20 THB of food total)
   if (order?.customer_id) {
     const foodTotal = Number(order.total) - deliveryFee
     const pointsEarned = Math.floor(foodTotal / 20)
@@ -48,4 +53,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ order: updatedOrder, rider })
-}
+}, ['rider'])

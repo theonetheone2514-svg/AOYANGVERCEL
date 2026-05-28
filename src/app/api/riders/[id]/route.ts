@@ -1,26 +1,32 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { withAuth } from '@/lib/api-utils'
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export const GET = withAuth(async (request: Request, session, params) => {
+  const { id } = params!
   const { data, error } = await supabase.from('riders').select('*').eq('id', id).single()
   if (error) return NextResponse.json({ error: 'ไม่พบไรเดอร์' }, { status: 404 })
+  if (session.user_type !== 'admin' && session.user_id !== id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+  }
   return NextResponse.json(data)
-}
+})
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export const PATCH = withAuth(async (request: Request, session, params) => {
+  const { id } = params!
+  if (session.user_type !== 'admin' && session.user_id !== id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+  }
   const body = await request.json()
   const { data, error } = await supabase
     .from('riders').update(body).eq('id', id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
-}
+})
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export const DELETE = withAuth(async (request: Request, session, params) => {
+  const { id } = params!
 
-  // Check for existing orders
   const { count: orderCount } = await supabase
     .from('orders')
     .select('*', { count: 'exact', head: true })
@@ -36,4 +42,4 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { error } = await supabase.from('riders').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
-}
+}, ['admin'])

@@ -4,6 +4,42 @@ import { supabase } from './supabase'
 const SESSION_COOKIE = 'session_token'
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000
 
+export class AuthError extends Error {
+  constructor(message: string, public status: number) {
+    super(message)
+  }
+}
+
+export class UnauthorizedError extends AuthError {
+  constructor() {
+    super('กรุณาเข้าสู่ระบบก่อน', 401)
+  }
+}
+
+export class ForbiddenError extends AuthError {
+  constructor() {
+    super('ไม่มีสิทธิ์เข้าถึงหน้านี้', 403)
+  }
+}
+
+export type UserType = 'customer' | 'merchant' | 'rider' | 'admin'
+
+export interface SessionInfo {
+  token: string
+  phone: string
+  user_type: UserType
+  user_id: string
+  expires_at: string
+  created_at: string
+}
+
+export async function requireAuth(allowedRoles?: UserType[]): Promise<SessionInfo> {
+  const session = await getCurrentSession()
+  if (!session) throw new UnauthorizedError()
+  if (allowedRoles && !allowedRoles.includes(session.user_type as UserType)) throw new ForbiddenError()
+  return session as SessionInfo
+}
+
 export function generateToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let token = ''

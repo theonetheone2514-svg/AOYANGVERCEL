@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { withAuth } from '@/lib/api-utils'
 
 export async function GET() {
   const { data, error } = await supabase.from('settings').select('*')
@@ -9,7 +10,7 @@ export async function GET() {
   return NextResponse.json(settings)
 }
 
-export async function PUT(request: Request) {
+export const PUT = withAuth(async (request: Request) => {
   const body = await request.json()
   const updates = Object.entries(body).map(([key, value]) => ({
     key,
@@ -21,4 +22,4 @@ export async function PUT(request: Request) {
   }
 
   return NextResponse.json({ success: true })
-}
+}, ['admin'])

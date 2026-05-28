@@ -1,33 +1,42 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { withAuth } from '@/lib/api-utils'
 
-export async function GET(request: Request) {
+export const GET = withAuth(async (request: Request, session) => {
   const { searchParams } = new URL(request.url)
   const phone = searchParams.get('phone')
   const id = searchParams.get('id')
 
-  let data: unknown
-  let error: unknown
-
-  if (phone) {
-    const result = await supabase.from('riders').select('*').eq('phone', phone).single()
-    data = result.data
-    error = result.error
-  } else if (id) {
-    const result = await supabase.from('riders').select('*').eq('id', id).single()
-    data = result.data
-    error = result.error
-  } else {
-    const result = await supabase.from('riders').select('*').order('name')
-    data = result.data
-    error = result.error
+  if (session.user_type !== 'admin') {
+    if (id && id !== session.user_id) {
+      return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+    }
+    if (phone && phone !== session.phone) {
+      return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+    }
+    if (!phone && !id) {
+      return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+    }
   }
 
-  if (error) return NextResponse.json({ error }, { status: 500 })
-  return NextResponse.json(data)
-}
+  let result: { data: unknown; error: unknown } | null = null
 
-export async function POST(request: Request) {
+  if (phone) {
+    result = await supabase.from('riders').select('*').eq('phone', phone).single()
+  } else if (id) {
+    result = await supabase.from('riders').select('*').eq('id', id).single()
+  } else {
+    result = await supabase.from('riders').select('*').order('name')
+  }
+
+  const data = result?.data
+  const err = result?.error
+
+  if (err) return NextResponse.json({ error: String(err) }, { status: 500 })
+  return NextResponse.json(data)
+})
+
+export const POST = withAuth(async (request: Request) => {
   const body = await request.json()
   const { phone, name } = body
 
@@ -40,4 +49,4 @@ export async function POST(request: Request) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
-}
+})
