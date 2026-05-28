@@ -21,6 +21,7 @@ interface CartPanelProps {
   onUpdateQty: (item: MenuItem, delta: number) => void
   isLoggedIn: boolean
   deliveryFee?: number
+  customerPoints?: number
 }
 
 function CartItemThumb({ item }: { item: MenuItem }) {
@@ -47,6 +48,7 @@ export default function CartPanel({
   onUpdateQty,
   isLoggedIn,
   deliveryFee = 10,
+  customerPoints = 0,
 }: CartPanelProps) {
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -55,6 +57,7 @@ export default function CartPanel({
 
   const cartArray = Array.from(items.values())
   const subtotal = cartArray.reduce((sum, { item, qty }) => sum + Number(item.price) * qty, 0)
+  const pointsEarned = Math.floor(subtotal / 20)
   const total = subtotal + deliveryFee
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('transfer')
 
@@ -118,6 +121,20 @@ export default function CartPanel({
             ))}
           </div>
         )}
+
+        {/* Points */}
+        <div className="bg-white border-t border-gray-100 px-4 py-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500">⭐ แต้มสะสมของคุณ</span>
+            <span className="font-semibold text-[#E65100]">{customerPoints} แต้ม</span>
+          </div>
+          {pointsEarned > 0 && (
+            <div className="flex items-center justify-between text-xs mt-1">
+              <span className="text-gray-400">แต้มที่จะได้รับจากออเดอร์นี้</span>
+              <span className="font-medium text-green-600">+{pointsEarned} แต้ม</span>
+            </div>
+          )}
+        </div>
 
         {/* Payment method */}
         <div className="bg-white border-t border-gray-100 px-4 py-3">

@@ -1,15 +1,25 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/AuthContext'
+
 export default function DashboardPage() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (loading) return
+    if (!user) { router.replace('/auth/login?redirect=/dashboard'); return }
+    if (user.type === 'admin') router.replace('/admin')
+    else if (user.type === 'merchant') router.replace('/merchant')
+    else if (user.type === 'rider') router.replace('/rider')
+    else router.replace('/') // customer
+  }, [user, loading, router])
+
   return (
-    <div className="min-h-dvh bg-[#FFF8E7]">
-      <header className="bg-[#9C4A35] text-white px-4 py-3">
-        <h1 className="text-xl font-bold">ภาพรวม</h1>
-        <p className="text-sm opacity-90">แดชบอร์ด</p>
-      </header>
-      <main className="p-4">
-        <p className="text-gray-600 text-center py-12">กำลังพัฒนา...</p>
-      </main>
+    <div className="min-h-dvh bg-[#FFF8E7] flex items-center justify-center">
+      <p className="text-gray-400">กำลังเปลี่ยนหน้า...</p>
     </div>
   )
 }

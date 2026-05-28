@@ -37,6 +37,7 @@ export default function Home() {
   const [category, setCategory] = useState('ทั้งหมด')
   const [ordering, setOrdering] = useState(false)
   const [showMap, setShowMap] = useState(false)
+  const [customerPoints, setCustomerPoints] = useState(0)
   const prevCount = useRef(0)
   const [bounce, setBounce] = useState(false)
   const greeting = getIsanGreeting()
@@ -44,6 +45,30 @@ export default function Home() {
   useEffect(() => {
     Promise.all([loadStores(), loadZones()])
   }, [])
+
+  // Load saved location + points for logged-in user
+  useEffect(() => {
+    if (!user) return
+    ;(async () => {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('id, points')
+        .eq('phone', user.phone)
+        .maybeSingle()
+      if (!cust) return
+      setCustomerPoints(cust.points || 0)
+      const { data: loc } = await supabase
+        .from('customer_locations')
+        .select('lat, lng')
+        .eq('customer_id', cust.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (loc) {
+        setSelectedLocation({ lat: loc.lat!, lng: loc.lng! })
+      }
+    })()
+  }, [user])
 
   async function loadStores() {
     setLoadingStores(true)
@@ -205,6 +230,14 @@ export default function Home() {
     await supabase.from('order_items').insert(
       items.map((i) => ({ ...i, order_id: order.id }))
     )
+
+    // Save location for next time
+    await supabase.from('customer_locations').upsert({
+      customer_id: customer.id,
+      lat: selectedLocation.lat,
+      lng: selectedLocation.lng,
+      address: DEFAULT_LOCATION.address,
+    }).maybeSingle()
 
     setCart(new Map())
     setShowCart(false)
@@ -417,6 +450,7 @@ export default function Home() {
           onCheckout={handleCheckout}
           onUpdateQty={(item, delta) => updateCart(item, delta)}
           isLoggedIn={!!user}
+          customerPoints={customerPoints}
         />
       )}
 

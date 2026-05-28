@@ -36,10 +36,16 @@ export default function UserMenu() {
               <div className="text-xs text-gray-400">{typeLabel[user.type] || user.type}</div>
             </div>
             <button
-              onClick={() => { setOpen(false); logout(); router.push('/') }}
-              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition"
+              onClick={() => { setOpen(false); router.push('/orders') }}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 rounded transition flex items-center gap-2"
             >
-              ออกจากระบบ
+              📋 ประวัติออเดอร์
+            </button>
+            <button
+              onClick={() => { setOpen(false); logout(); router.push('/') }}
+              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition flex items-center gap-2"
+            >
+              🚪 ออกจากระบบ
             </button>
           </div>
         </>
