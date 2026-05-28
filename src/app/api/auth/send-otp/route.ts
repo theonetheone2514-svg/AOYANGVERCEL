@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { generateOtp } from '@/lib/auth'
+import { pushMessage } from '@/lib/line'
 
 const RATE_LIMIT_MS = 60_000
+
+async function getLineUserId(phone: string): Promise<string | null> {
+  for (const table of ['customers', 'stores', 'riders'] as const) {
+    const { data } = await supabase
+      .from(table)
+      .select('line_user_id')
+      .eq('phone', phone)
+      .single()
+    if (data?.line_user_id) return data.line_user_id
+  }
+  return null
+}
 
 export async function POST(request: Request) {
   const { phone } = await request.json()
@@ -32,23 +45,21 @@ export async function POST(request: Request) {
     { onConflict: 'phone' }
   )
 
-  const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
-  const lineUserId = process.env.LINE_USER_ID
+  const lineUserId = await getLineUserId(phone) || process.env.LINE_USER_ID
 
-  if (lineToken) {
-    const message = `🔐 รหัส OTP ของคุณคือ ${otp}\n\nรหัสนี้ใช้ได้ 5 นาที\n\n*ถ้าไม่ได้ขอรหัส ให้เพิกเฉยได้เลย`
-    await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lineToken}`,
+  if (lineUserId) {
+    pushMessage(lineUserId, [
+      {
+        type: 'text',
+        text: `🔐 รหัส OTP ของคุณคือ ${otp}\n\nรหัสนี้ใช้ได้ 5 นาที\n\n*ถ้าไม่ได้ขอรหัส ให้เพิกเฉยได้เลย`,
       },
-      body: JSON.stringify({
-        to: lineUserId,
-        messages: [{ type: 'text', text: message }],
-      }),
-    }).catch(() => {})
+    ])
   }
 
-  return NextResponse.json({ success: true, message: 'ส่ง OTP ทาง LINE แล้ว' })
+  const isDirect = !!(await getLineUserId(phone))
+  return NextResponse.json({
+    success: true,
+    message: isDirect ? 'ส่ง OTP ทาง LINE แล้ว' : 'ส่ง OTP ทาง LINE ของ admin แล้ว',
+    direct: isDirect,
+  })
 }

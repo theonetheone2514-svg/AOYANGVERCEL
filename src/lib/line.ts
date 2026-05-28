@@ -186,6 +186,8 @@ export function cartFlex(items: { name: string; qty: number; price: number }[], 
 export function helpMessage(): LineMessage {
   return textMessage(
     '🔰 วิธีใช้ LINE Bot\n━━━━━━━━━━━━━━\n' +
+    '• "ผูก 092XXXXXXX" — ผูก LINE กับเบอร์\n' +
+    '• "เลิกผูก" — เลิกผูก LINE\n' +
     '• "เมนู" — ดูร้านค้าทั้งหมด\n' +
     '• "ร้าน [ชื่อ]" — ดูเมนูของร้าน\n' +
     '• "+[ชื่อเมนู]" — เพิ่มในตะกร้า\n' +

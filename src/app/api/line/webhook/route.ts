@@ -19,6 +19,18 @@ async function saveUserState(lineUserId: string, state: any) {
   )
 }
 
+async function findUserByLineId(lineUserId: string) {
+  for (const table of ['customers', 'stores', 'riders'] as const) {
+    const { data } = await supabase
+      .from(table)
+      .select('*')
+      .eq('line_user_id', lineUserId)
+      .single()
+    if (data) return { type: table, ...data }
+  }
+  return null
+}
+
 export async function POST(request: Request) {
   const body = await request.json()
   const events = body.events || []
@@ -42,6 +54,40 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
   // Help
   if (text === 'ช่วยเหลือ' || text === 'help') {
     return replyMessage(replyToken, [helpMessage()])
+  }
+
+  // Link phone: "link 0929892085" or "ผูก 0929892085"
+  if (text.startsWith('link ') || text.startsWith('ผูก ')) {
+    const phone = text.replace(/^(link|ผูก)\s+/, '').trim()
+    if (!phone || phone.length < 10) {
+      return replyMessage(replyToken, [textMessage('😅 กรุณาพิมพ์ "link 092XXXXXXX" หรือ "ผูก 092XXXXXXX"')])
+    }
+
+    const { data: customer } = await supabase
+      .from('customers').select('id').eq('phone', phone).single()
+    const { data: store } = await supabase
+      .from('stores').select('id').eq('phone', phone).single()
+    const { data: rider } = await supabase
+      .from('riders').select('id').eq('phone', phone).single()
+
+    if (!customer && !store && !rider) {
+      return replyMessage(replyToken, [textMessage('😅 ไม่พบเบอร์โทรนี้ในระบบ กรุณาลงทะเบียนก่อน')])
+    }
+
+    if (customer) await supabase.from('customers').update({ line_user_id: lineUserId }).eq('id', customer.id)
+    if (store) await supabase.from('stores').update({ line_user_id: lineUserId }).eq('id', store.id)
+    if (rider) await supabase.from('riders').update({ line_user_id: lineUserId }).eq('id', rider.id)
+
+    return replyMessage(replyToken, [textMessage(`✅ ผูก LINE กับเบอร์ ${phone} สำเร็จ!\nต่อจากนี้ OTP จะส่งมาให้คุณโดยตรง`)])
+
+  }
+
+  // Unlink: "unlink" or "เลิกผูก"
+  if (text === 'unlink' || text === 'เลิกผูก') {
+    await supabase.from('customers').update({ line_user_id: null }).eq('line_user_id', lineUserId)
+    await supabase.from('stores').update({ line_user_id: null }).eq('line_user_id', lineUserId)
+    await supabase.from('riders').update({ line_user_id: null }).eq('line_user_id', lineUserId)
+    return replyMessage(replyToken, [textMessage('✅ เลิกผูก LINE เรียบร้อย')])
   }
 
   // Show store list
@@ -138,19 +184,16 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
       return replyMessage(replyToken, [textMessage('😅 ตะกร้าว่างหรือยังไม่ได้เลือกร้าน')])
     }
 
-    // Find customer by LINE userId
-    const { data: customer } = await supabase
-      .from('customers').select('*').is('user_id', null).limit(1).single()
-
-    if (!customer) {
-      return replyMessage(replyToken, [textMessage('😅 กรุณาเข้าสู่ระบบก่อนสั่ง')])
+    const user = await findUserByLineId(lineUserId)
+    if (!user || user.type !== 'customers') {
+      return replyMessage(replyToken, [textMessage('😅 กรุณาผูก LINE กับเบอร์โทรก่อนสั่ง\nพิมพ์ "link 092XXXXXXX" เพื่อผูก')])
     }
 
     const total = cart.reduce((sum: number, c: any) => sum + c.price * c.qty, 0)
 
     const { data: order, error } = await supabase
-      .from('orders')      .insert({
-        customer_id: customer.id,
+      .from('orders').insert({
+        customer_id: user.id,
         store_id: storeId,
         total: total + DEFAULT_DELIVERY_FEE,
         delivery_fee: DEFAULT_DELIVERY_FEE,
@@ -170,12 +213,10 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
     }))
     await supabase.from('order_items').insert(orderItems)
 
-    // Clear cart
     state.cart = []
     state.current_store_id = null
     await saveUserState(lineUserId, state)
 
-    // Notify merchant via LINE
     const itemsText = orderItems.map((i: any) => `  ${i.qty}x ${i.name}`).join('\n')
     pushMessage(process.env.LINE_USER_ID!, [
       textMessage(`🍳 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n📋 เลขที่: ${order.id.slice(0, 8)}\n💵 รวม: ${order.total} บาท\n📝 รายการ:\n${itemsText}\n━━━━━━━━━━━━━━`),
@@ -207,8 +248,7 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
     ])
   }
 
-  // Default: show help
   return replyMessage(replyToken, [
-    textMessage(`👋 สวัสดีจ้า!\nพิมพ์ "เมนู" เพื่อดูร้านค้า หรือ "ช่วยเหลือ" สำหรับคำแนะนำ`),
+    textMessage(`👋 สวัสดีจ้า!\nพิมพ์ "ผูก 092XXXXXXX" เพื่อผูก LINE กับเบอร์โทร\nพิมพ์ "เมนู" เพื่อดูร้าน\nพิมพ์ "ช่วยเหลือ" สำหรับคำแนะนำ`),
   ])
 }
