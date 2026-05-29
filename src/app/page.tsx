@@ -43,7 +43,6 @@ export default function Home() {
     const parsed = searchSchema.safeParse(value)
     setSearch(parsed.success ? parsed.data : '')
   }
-  const [ordering, setOrdering] = useState(false)
   const [showMap, setShowMap] = useState(false)
   const [customerPoints, setCustomerPoints] = useState(0)
   const prevCount = useRef(0)
@@ -201,8 +200,6 @@ export default function Home() {
     }
     if (!selectedStore) return
 
-    setOrdering(true)
-
     const items = Array.from(cart.values()).map(({ item, qty }) => ({
       menu_id: item.id,
       name: item.name,
@@ -227,13 +224,11 @@ export default function Home() {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'เกิดข้อผิดพลาด' }))
       alert('สั่งออเดอร์ไม่สำเร็จ: ' + (err.error || ''))
-      setOrdering(false)
       return
     }
 
     setCart(new Map())
     setShowCart(false)
-    setOrdering(false)
     alert('✅ สั่งออเดอร์สำเร็จ! รอร้านค้ายืนยัน')
   }
 

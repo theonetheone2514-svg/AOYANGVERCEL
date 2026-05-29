@@ -113,10 +113,6 @@ export default function OrdersTab({ storeId }: Props) {
   const activeOrders = orders.filter((o) =>
     !['จัดส่งสำเร็จ', 'ยกเลิก'].includes(o.status)
   )
-  const completedOrders = orders.filter((o) =>
-    ['จัดส่งสำเร็จ', 'ยกเลิก'].includes(o.status)
-  )
-
   if (loading) {
     return (
       <div className="p-4 space-y-4">

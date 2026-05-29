@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   }
 
   let userId: string | undefined
-  let userType: 'merchant' | 'rider' = role
+  const userType: 'merchant' | 'rider' = role
 
   if (role === 'merchant') {
     // Generate next store ID
