@@ -12,9 +12,9 @@ export const POST = withAuth(async (request: Request, session) => {
 
   const body = await request.json()
   const validated = validate(createOrderSchema, body)
-  if (validated.error) return validated.error
+  if (!validated.success) return validated.error
 
-  const { store_id, items, delivery_fee, lat, lng, address, note, payment_method, idempotency_key } = validated.data!
+  const { store_id, items, delivery_fee, lat, lng, address, note, payment_method, idempotency_key } = validated.data
 
   const admin = getSupabaseAdmin()
 

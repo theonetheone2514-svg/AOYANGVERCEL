@@ -12,7 +12,7 @@ const sizes = [
   { size: 180, name: 'apple-touch-icon.png' },
 ]
 
-const outDir = resolve(__dirname, '../public/icons')
+const outDir = resolve(__dirname, '../public')
 if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
 
 await Promise.all(

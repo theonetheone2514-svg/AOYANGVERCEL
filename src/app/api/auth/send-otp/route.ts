@@ -35,8 +35,8 @@ export async function POST(request: Request) {
   let body: unknown
   try { body = await request.json() } catch { return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 }) }
   const validated = validate(sendOtpSchema, body)
-  if (validated.error) return validated.error
-  const { phone } = validated.data!
+  if (!validated.success) return validated.error
+  const { phone } = validated.data
 
   const { data: existing } = await supabase
     .from('otps')

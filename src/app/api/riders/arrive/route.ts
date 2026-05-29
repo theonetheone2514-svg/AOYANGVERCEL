@@ -9,7 +9,7 @@ export const POST = withAuth(async (request: Request, session) => {
   if (limit) return limit
   const body = await request.json()
   const parsed = validate(orderIdSchema, body)
-  if (parsed.error) return parsed.error
+  if (!parsed.success) return parsed.error
 
   const admin = getSupabaseAdmin()
   const { data: order } = await admin

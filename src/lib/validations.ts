@@ -1,13 +1,13 @@
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 
-export function validate<T>(schema: z.ZodSchema<T>, data: unknown): { data: T; error?: undefined } | { data?: undefined; error: Response } {
+export function validate<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; error: Response } {
   const result = schema.safeParse(data)
   if (!result.success) {
     const firstIssue = result.error.issues[0]
-    return { error: NextResponse.json({ error: firstIssue.message }, { status: 400 }) }
+    return { success: false as const, error: NextResponse.json({ error: firstIssue.message }, { status: 400 }) }
   }
-  return { data: result.data }
+  return { success: true as const, data: result.data as T }
 }
 
 export const orderItemSchema = z.object({

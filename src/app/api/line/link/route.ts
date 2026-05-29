@@ -10,7 +10,7 @@ export const POST = withAuth(async (request: Request, session) => {
 
   const body = await request.json()
   const parsed = validate(lineLinkSchema, body)
-  if (parsed.error) return parsed.error
+  if (!parsed.success) return parsed.error
 
   const { line_user_id } = parsed.data
   const phone = session.phone

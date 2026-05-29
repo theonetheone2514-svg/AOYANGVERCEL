@@ -14,7 +14,7 @@ export async function GET() {
 export const PUT = withAuth(async (request: Request) => {
   const body = await request.json()
   const parsed = validate(updateSettingsSchema, body)
-  if (parsed.error) return parsed.error
+  if (!parsed.success) return parsed.error
 
   const updates = Object.entries(parsed.data).map(([key, value]) => ({
     key,

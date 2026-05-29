@@ -38,7 +38,7 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
   const { id } = params!
   const body = await request.json()
   const validated = validate(updateOrderSchema, body)
-  if (validated.error) return validated.error
+  if (!validated.success) return validated.error
 
   const admin = getSupabaseAdmin()
 

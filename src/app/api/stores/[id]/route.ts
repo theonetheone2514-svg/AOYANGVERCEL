@@ -26,7 +26,7 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
 
   const body = await request.json()
   const parsed = validate(updateStoreSchema, body)
-  if (parsed.error) return parsed.error
+  if (!parsed.success) return parsed.error
 
   const admin = getSupabaseAdmin()
   const { data, error } = await admin

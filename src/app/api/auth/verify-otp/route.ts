@@ -22,8 +22,8 @@ export async function POST(request: Request) {
   let body: unknown
   try { body = await request.json() } catch { return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 }) }
   const validated = validate(verifyOtpSchema, body)
-  if (validated.error) return validated.error
-  const { phone, otp } = validated.data!
+  if (!validated.success) return validated.error
+  const { phone, otp } = validated.data
 
   if (!phone || !otp) {
     return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, { status: 400 })

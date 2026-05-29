@@ -6,7 +6,7 @@ import { validate, updatePointsSchema } from '@/lib/validations'
 export const PATCH = withAuth(async (request: Request) => {
   const body = await request.json()
   const parsed = validate(updatePointsSchema, body)
-  if (parsed.error) return parsed.error
+  if (!parsed.success) return parsed.error
 
   const { data, error } = await supabase
     .from('customers').update({ points: parsed.data.points }).eq('id', parsed.data.customer_id).select().single()

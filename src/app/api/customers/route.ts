@@ -29,7 +29,7 @@ export const GET = withAuth(async (request: Request, session) => {
 export const POST = withAuth(async (request: Request) => {
   const body = await request.json()
   const parsed = validate(createCustomerSchema, body)
-  if (parsed.error) return parsed.error
+  if (!parsed.success) return parsed.error
 
   const admin = getSupabaseAdmin()
   const { data, error } = await admin

@@ -7,7 +7,7 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
   const { id } = params!
   const body = await request.json()
   const parsed = validate(createMenuItemSchema.partial(), body)
-  if (parsed.error) return parsed.error
+  if (!parsed.success) return parsed.error
 
   const admin = getSupabaseAdmin()
 

@@ -21,9 +21,8 @@ export async function POST(request: Request) {
   let body: unknown
   try { body = await request.json() } catch { return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 }) }
   const validated = validate(registerSchema, body)
-  if (validated.error) return validated.error
-  const { phone, otp, role } = validated.data!
-  const v = validated.data as { phone: string; otp: string; role: 'merchant' | 'rider'; name?: string }
+  if (!validated.success) return validated.error
+  const { phone, otp, role, name } = validated.data
 
   // Verify OTP (hashed comparison)
   const { data: otpData } = await supabase
@@ -78,7 +77,7 @@ export async function POST(request: Request) {
       .from('stores')
       .insert({
         id: storeId,
-        name: v.name!,
+        name: name!,
         phone,
         status: 'closed',
         wait_time: 20,
@@ -97,7 +96,7 @@ export async function POST(request: Request) {
     const { data: rider, error } = await admin
       .from('riders')
       .insert({
-        name: v.name!,
+        name: name!,
         phone,
         zone_id: zone_id || null,
         earnings: 0,
