@@ -1,6 +1,6 @@
 'use client'
 
-export default function RiderError({ error, reset }: { error: Error; reset: () => void }) {
+export default function RiderError({ reset }: { error: Error; reset: () => void }) {
   return (
     <div className="min-h-dvh bg-[#FFF8E7] flex flex-col items-center justify-center p-4">
       <h1 className="text-4xl font-bold text-[#9C4A35]">😵 เกิดข้อผิดพลาด</h1>

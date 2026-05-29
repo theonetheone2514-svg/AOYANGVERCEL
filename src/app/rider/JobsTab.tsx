@@ -74,7 +74,7 @@ export default function JobsTab({ rider, onUpdate }: Props) {
           table: 'orders',
           filter: 'status=eq.พร้อมจัดส่ง',
         },
-        (payload: RealtimePostgresChangesPayload<any>) => {
+        () => {
           loadJobs()
         }
       )

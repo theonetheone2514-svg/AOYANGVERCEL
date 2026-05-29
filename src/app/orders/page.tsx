@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/AuthContext'
@@ -30,13 +30,7 @@ export default function OrdersPage() {
   const [ratingOrder, setRatingOrder] = useState<OrderWithItems | null>(null)
   const [ratedOrderIds, setRatedOrderIds] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    if (authLoading) return
-    if (!user) { router.replace('/auth/login?redirect=/orders'); return }
-    loadOrders()
-  }, [user, authLoading])
-
-  async function loadOrders() {
+  const loadOrders = useCallback(async () => {
     const { data: cust } = await supabase
       .from('customers')
       .select('id')
@@ -63,7 +57,13 @@ export default function OrdersPage() {
     }
 
     setLoading(false)
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) { router.replace('/auth/login?redirect=/orders'); return }
+    loadOrders()
+  }, [user, authLoading, loadOrders, router])
 
   const filtered = filter === 'ทั้งหมด'
     ? orders
