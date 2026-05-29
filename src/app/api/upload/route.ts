@@ -21,7 +21,7 @@ async function ensureBucket() {
 }
 
 export const POST = withAuth(async (request: Request, session) => {
-  const limit = checkRateLimit(`upload:${session.user_id}`, { maxRequests: 5, windowMs: 60_000 })
+  const limit = await checkRateLimit(`upload:${session.user_id}`, { maxRequests: 5, windowMs: 60_000 })
   if (limit) return limit
 
   const formData = await request.formData()

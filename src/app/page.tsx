@@ -14,6 +14,8 @@ import CartPanel from '@/components/CartPanel'
 import { StoreCardSkeleton, MenuItemSkeleton } from '@/components/Skeleton'
 import { DEFAULT_LOCATION } from '@/lib/utils'
 import { getIsanGreeting } from '@/lib/greeting'
+import { searchSchema } from '@/lib/validations'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 import { MapPin, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
 
@@ -36,6 +38,11 @@ export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
+
+  function setSanitizedSearch(value: string) {
+    const parsed = searchSchema.safeParse(value)
+    setSearch(parsed.success ? parsed.data : '')
+  }
   const [ordering, setOrdering] = useState(false)
   const [showMap, setShowMap] = useState(false)
   const [customerPoints, setCustomerPoints] = useState(0)
@@ -196,66 +203,33 @@ export default function Home() {
 
     setOrdering(true)
 
-    let { data: customer } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('phone', user.phone)
-      .single()
-    if (!customer) {
-      const { data: newCust } = await supabase
-        .from('customers')
-        .insert({ phone: user.phone })
-        .select()
-        .single()
-      customer = newCust
-    }
-    if (!customer) {
-      alert('เกิดข้อผิดพลาดในการสร้างผู้ใช้')
-      setOrdering(false)
-      return
-    }
-
     const items = Array.from(cart.values()).map(({ item, qty }) => ({
       menu_id: item.id,
       name: item.name,
       price: item.price,
       qty,
     }))
-    const total = cartTotal + 10
 
-    const { data: order, error } = await supabase
-      .from('orders')
-      .insert({
-        customer_id: customer.id,
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify({
         store_id: selectedStore.id,
-        total,
+        items,
         delivery_fee: 10,
         lat: selectedLocation.lat,
         lng: selectedLocation.lng,
         address: DEFAULT_LOCATION.address,
         payment_method: paymentMethod,
-        status: 'รอดำเนินการ',
-      })
-      .select()
-      .single()
+      }),
+    })
 
-    if (error || !order) {
-      alert('สั่งออเดอร์ไม่สำเร็จ: ' + (error?.message || ''))
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'เกิดข้อผิดพลาด' }))
+      alert('สั่งออเดอร์ไม่สำเร็จ: ' + (err.error || ''))
       setOrdering(false)
       return
     }
-
-    await supabase.from('order_items').insert(
-      items.map((i) => ({ ...i, order_id: order.id }))
-    )
-
-    // Save location for next time
-    await supabase.from('customer_locations').upsert({
-      customer_id: customer.id,
-      lat: selectedLocation.lat,
-      lng: selectedLocation.lng,
-      address: DEFAULT_LOCATION.address,
-    }).maybeSingle()
 
     setCart(new Map())
     setShowCart(false)
@@ -289,7 +263,7 @@ export default function Home() {
           </div>
           <SearchBar
             value={search}
-            onChange={setSearch}
+            onChange={setSanitizedSearch}
             placeholder="ค้นหาเมนูเด็ด..."
           />
         </div>

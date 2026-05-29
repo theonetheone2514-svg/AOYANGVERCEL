@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 export default function RiderRegisterPage() {
   const router = useRouter()
@@ -31,7 +32,7 @@ export default function RiderRegisterPage() {
     setSending(true)
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
       body: JSON.stringify({ phone }),
     })
     setSending(false)
@@ -61,7 +62,7 @@ export default function RiderRegisterPage() {
     setSubmitting(true)
     const res = await fetch('/api/auth/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
       body: JSON.stringify({ phone, otp, role: 'rider', name: name.trim(), zone_id: zoneId || undefined }),
     })
     setSubmitting(false)

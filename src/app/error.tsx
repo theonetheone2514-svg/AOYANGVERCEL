@@ -1,6 +1,11 @@
 'use client'
 
+import { useEffect } from 'react'
+
 export default function Error({ error, reset }: { error: Error; reset: () => void }) {
+  useEffect(() => {
+    console.error(JSON.stringify({ level: 'error', message: error.message, stack: error.stack, timestamp: new Date().toISOString() }))
+  }, [error])
   return (
     <div className="min-h-dvh bg-[#FFF8E7] flex flex-col items-center justify-center p-4">
       <h1 className="text-4xl font-bold text-[#9C4A35]">😵 เกิดข้อผิดพลาด</h1>

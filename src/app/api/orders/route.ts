@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { pushMessage, textMessage } from '@/lib/line'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { pushMessage, pushToStore, textMessage } from '@/lib/line'
 import { withAuth } from '@/lib/api-utils'
 import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { validate, createOrderSchema } from '@/lib/validations'
 
 export const POST = withAuth(async (request: Request, session) => {
-  const limit = checkRateLimit(`order:${session.user_id}`, { maxRequests: 10, windowMs: 60_000 })
+  const limit = await checkRateLimit(`order:${session.user_id}`, { maxRequests: 10, windowMs: 60_000 })
   if (limit) return limit
 
   const body = await request.json()
@@ -16,8 +17,10 @@ export const POST = withAuth(async (request: Request, session) => {
 
   const { store_id, items, delivery_fee, lat, lng, address, note, payment_method, idempotency_key } = validated.data!
 
+  const admin = getSupabaseAdmin()
+
   if (idempotency_key) {
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('orders')
       .select('*, items:order_items(*)')
       .eq('idempotency_key', idempotency_key)
@@ -30,7 +33,7 @@ export const POST = withAuth(async (request: Request, session) => {
 
   const df = delivery_fee ?? DEFAULT_DELIVERY_FEE
 
-  const { data, error } = await supabase.rpc('place_order', {
+  const { data, error } = await admin.rpc('place_order', {
     p_customer_id: session.user_id,
     p_store_id: store_id,
     p_items: items.map((i: { menu_id: string; name: string; price: number; qty: number }) => ({
@@ -58,18 +61,28 @@ export const POST = withAuth(async (request: Request, session) => {
   const order = data.order
 
   if (idempotency_key) {
-    await supabase.from('orders').update({ idempotency_key }).eq('id', order.id)
+    await admin.from('orders').update({ idempotency_key }).eq('id', order.id)
   }
 
+  // Save delivery location for next time
+  if (lat && lng) {
+    await admin.from('customer_locations').upsert({
+      customer_id: session.user_id,
+      lat,
+      lng,
+      address: address ?? null,
+    }).maybeSingle()
+  }
+
+  const itemsText = order.items.map((i: { name: string; price: number; qty: number }) =>
+    `  ${i.qty}x ${i.name}  ${i.price * i.qty} บาท`
+  ).join('\n')
+  const msg = textMessage(
+    `🆕 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n${itemsText}\n━━━━━━━━━━━━━━\n💵 รวม: ${order.total} บาท\n📍 ${order.address || 'ไม่ระบุ'}\n📝 ${order.note || '-'}\n━━━━━━━━━━━━━━\n#${order.id.slice(0, 8)}`
+  )
+  pushToStore(store_id, [msg])
   if (process.env.LINE_USER_ID) {
-    const itemsText = order.items.map((i: { name: string; price: number; qty: number }) =>
-      `  ${i.qty}x ${i.name}  ${i.price * i.qty} บาท`
-    ).join('\n')
-    pushMessage(process.env.LINE_USER_ID, [
-      textMessage(
-        `🆕 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n${itemsText}\n━━━━━━━━━━━━━━\n💵 รวม: ${order.total} บาท\n📍 ${order.address || 'ไม่ระบุ'}\n📝 ${order.note || '-'}\n━━━━━━━━━━━━━━\n#${order.id.slice(0, 8)}`
-      ),
-    ])
+    pushMessage(process.env.LINE_USER_ID, [msg])
   }
 
   return NextResponse.json(order, { status: 201 })
@@ -83,7 +96,8 @@ export const GET = withAuth(async (request: Request, session) => {
   const status = searchParams.get('status')
   const zoneId = searchParams.get('zone_id')
 
-  let query = supabase.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false })
+  const admin = getSupabaseAdmin()
+  let query = admin.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false })
 
   if (storeId) query = query.eq('store_id', storeId)
   if (customerId) query = query.eq('customer_id', customerId)
@@ -93,7 +107,7 @@ export const GET = withAuth(async (request: Request, session) => {
 
   if (session.user_type === 'admin') {
   } else if (session.user_type === 'merchant') {
-    const { data: stores } = await supabase.from('stores').select('id').eq('phone', session.phone)
+    const { data: stores } = await admin.from('stores').select('id').eq('phone', session.phone)
     const storeIds = stores?.map(s => s.id) || []
     query = query.in('store_id', storeIds)
   } else if (session.user_type === 'rider') {

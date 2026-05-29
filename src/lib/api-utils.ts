@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAuth, AuthError, type UserType } from './auth'
+import { validateOrigin, validateCsrfToken, originError, csrfError } from './csrf'
 
 export type ApiHandler = (
   req: Request,
@@ -7,9 +8,18 @@ export type ApiHandler = (
   params?: Record<string, string>
 ) => Promise<Response>
 
+function isMutationMethod(method: string): boolean {
+  return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())
+}
+
 export function withAuth(handler: ApiHandler, allowedRoles?: UserType[]) {
   return async (req: Request, context?: { params?: Promise<Record<string, string>> }) => {
     try {
+      if (isMutationMethod(req.method)) {
+        if (!validateOrigin(req)) return originError()
+        if (!validateCsrfToken(req)) return csrfError()
+      }
+
       const session = await requireAuth(allowedRoles)
       const params = context?.params ? await context.params : undefined
       return handler(req, session, params)
@@ -17,7 +27,9 @@ export function withAuth(handler: ApiHandler, allowedRoles?: UserType[]) {
       if (e instanceof AuthError) {
         return NextResponse.json({ error: e.message }, { status: e.status })
       }
-      throw e
+      const msg = e instanceof Error ? e.message : 'Unknown error'
+      console.error(JSON.stringify({ level: 'error', message: msg, timestamp: new Date().toISOString() }))
+      return NextResponse.json({ error: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' }, { status: 500 })
     }
   }
 }

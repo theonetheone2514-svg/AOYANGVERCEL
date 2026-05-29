@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
 
 export const GET = withAuth(async (request: Request, session) => {
@@ -12,7 +12,8 @@ export const GET = withAuth(async (request: Request, session) => {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
   }
 
-  const query = supabase.from('customers').select('*')
+  const admin = getSupabaseAdmin()
+  const query = admin.from('customers').select('*')
   if (requestedId) {
     query.eq('id', requestedId)
   } else {
@@ -30,7 +31,8 @@ export const POST = withAuth(async (request: Request) => {
 
   if (!phone) return NextResponse.json({ error: 'กรุณากรอกเบอร์โทร' }, { status: 400 })
 
-  const { data, error } = await supabase
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin
     .from('customers')
     .insert({ phone, name })
     .select()

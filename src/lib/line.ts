@@ -1,3 +1,5 @@
+import { getSupabaseAdmin } from './supabase-admin'
+
 const LINE_API = 'https://api.line.me/v2/bot/message'
 
 function getAuthHeaders() {
@@ -10,19 +12,66 @@ function getAuthHeaders() {
 }
 
 export async function replyMessage(replyToken: string, messages: LineMessage[]) {
-  await fetch(`${LINE_API}/reply`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ replyToken, messages }),
-  }).catch(() => {})
+  try {
+    const res = await fetch(`${LINE_API}/reply`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ replyToken, messages }),
+    })
+    if (!res.ok) {
+      console.error(JSON.stringify({ level: 'error', message: 'LINE reply failed', status: res.status, timestamp: new Date().toISOString() }))
+    }
+  } catch (e) {
+    console.error(JSON.stringify({ level: 'error', message: 'LINE reply error', error: String(e), timestamp: new Date().toISOString() }))
+  }
 }
 
 export async function pushMessage(to: string, messages: LineMessage[]) {
-  await fetch(`${LINE_API}/push`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ to, messages }),
-  }).catch(() => {})
+  try {
+    const res = await fetch(`${LINE_API}/push`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ to, messages }),
+    })
+    if (!res.ok) {
+      console.error(JSON.stringify({ level: 'error', message: 'LINE push failed', status: res.status, to, timestamp: new Date().toISOString() }))
+    }
+  } catch (e) {
+    console.error(JSON.stringify({ level: 'error', message: 'LINE push error', error: String(e), timestamp: new Date().toISOString() }))
+  }
+}
+
+export async function pushToStore(storeId: string, messages: LineMessage[]) {
+  const { data } = await getSupabaseAdmin()
+    .from('stores')
+    .select('line_user_id, name')
+    .eq('id', storeId)
+    .single()
+  if (data?.line_user_id) {
+    await pushMessage(data.line_user_id, messages)
+  }
+}
+
+export async function pushToRider(riderId: string, messages: LineMessage[]) {
+  const { data } = await getSupabaseAdmin()
+    .from('riders')
+    .select('line_user_id')
+    .eq('id', riderId)
+    .single()
+  if (data?.line_user_id) {
+    await pushMessage(data.line_user_id, messages)
+  }
+}
+
+export async function pushToCustomer(customerId: string, messages: LineMessage[]) {
+  const { data } = await getSupabaseAdmin()
+    .from('customers')
+    .select('line_user_id')
+    .eq('id', customerId)
+    .single()
+  if (data?.line_user_id) {
+    await pushMessage(data.line_user_id, messages)
+  }
 }
 
 export interface LineMessage {
@@ -186,13 +235,14 @@ export function cartFlex(items: { name: string; qty: number; price: number }[], 
 export function helpMessage(): LineMessage {
   return textMessage(
     '🔰 วิธีใช้ LINE Bot\n━━━━━━━━━━━━━━\n' +
+    '• "สมัคร 092XXXXXXX" — ลงทะเบียนสมาชิก\n' +
     '• "ผูก 092XXXXXXX" — ผูก LINE กับเบอร์\n' +
     '• "เลิกผูก" — เลิกผูก LINE\n' +
     '• "เมนู" — ดูร้านค้าทั้งหมด\n' +
     '• "ร้าน [ชื่อ]" — ดูเมนูของร้าน\n' +
     '• "+[ชื่อเมนู]" — เพิ่มในตะกร้า\n' +
     '• "ตะกร้า" — ดูตะกร้าสินค้า\n' +
-    '• "สั่ง" — ยืนยันสั่งอาหาร\n' +
+    '• "สั่ง" — สั่งอาหาร (ระบุที่อยู่ก่อน)\n' +
     '• "สถานะ [เลขออเดอร์]" — เช็คสถานะ\n' +
     '• "ช่วยเหลือ" — ดูวิธีใช้\n' +
     '━━━━━━━━━━━━━━\n#เอาหยังบ่'

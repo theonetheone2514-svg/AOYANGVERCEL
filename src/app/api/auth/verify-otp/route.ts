@@ -1,13 +1,22 @@
+import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { createSession, getSessionCookieHeaders } from '@/lib/auth'
 import { ADMIN_PHONES } from '@/lib/constants'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 import { validate, verifyOtpSchema } from '@/lib/validations'
+import { validateOrigin, originError } from '@/lib/csrf'
+
+function hashOtp(phone: string, otp: string): string {
+  return createHash('sha256').update(`${phone}:${otp}`).digest('hex')
+}
 
 export async function POST(request: Request) {
+  if (!validateOrigin(request)) return originError()
+
   const ip = getIp(request)
-  const rl = rateLimit(`verify-otp:${ip}`, { maxRequests: 10, windowMs: 60_000 })
+  const rl = await rateLimit(`verify-otp:${ip}`, { maxRequests: 10, windowMs: 60_000 })
   if (!rl.allowed) {
     return NextResponse.json({ error: 'โหลดเยอะเกินไป กรุณาลองใหม่ภายหลัง' }, {
       status: 429,
@@ -15,7 +24,8 @@ export async function POST(request: Request) {
     })
   }
 
-  const body = await request.json()
+  let body: unknown
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 }) }
   const validated = validate(verifyOtpSchema, body)
   if (validated.error) return validated.error
   const { phone, otp } = validated.data!
@@ -28,7 +38,7 @@ export async function POST(request: Request) {
     .from('otps')
     .select('*')
     .eq('phone', phone)
-    .eq('otp', otp)
+    .eq('otp', hashOtp(phone, otp))
     .eq('used', false)
     .single()
 
@@ -45,11 +55,12 @@ export async function POST(request: Request) {
   // Determine user type and ID
   let userType: 'customer' | 'merchant' | 'rider' | 'admin' = 'customer'
   let userId: string | undefined
+  const admin = getSupabaseAdmin()
 
-  const { data: store } = await supabase.from('stores').select('id').eq('phone', phone).single()
+  const { data: store } = await admin.from('stores').select('id').eq('phone', phone).single()
   if (store) {
     // Check if store is deactivated by admin
-    const { data: deactivated } = await supabase
+    const { data: deactivated } = await admin
       .from('settings').select('value').eq('key', `deactivated_store:${store.id}`).single()
     if (deactivated?.value === 'true') {
       return NextResponse.json({ error: 'ร้านค้าถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, { status: 403 })
@@ -58,10 +69,10 @@ export async function POST(request: Request) {
     userId = store.id
   }
 
-  const { data: rider } = await supabase.from('riders').select('id').eq('phone', phone).single()
+  const { data: rider } = await admin.from('riders').select('id').eq('phone', phone).single()
   if (rider) {
     // Check if rider is deactivated by admin
-    const { data: deactivated } = await supabase
+    const { data: deactivated } = await admin
       .from('settings').select('value').eq('key', `deactivated_rider:${rider.id}`).single()
     if (deactivated?.value === 'true') {
       return NextResponse.json({ error: 'ไรเดอร์ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, { status: 403 })
@@ -71,13 +82,13 @@ export async function POST(request: Request) {
   }
 
   if (!store && !rider) {
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('customers').select('id, name').eq('phone', phone).single()
 
     if (existing) {
       userId = existing.id
     } else {
-      const { data: newCustomer } = await supabase
+      const { data: newCustomer } = await admin
         .from('customers').insert({ phone, points: 0 }).select().single()
       userId = newCustomer?.id
     }

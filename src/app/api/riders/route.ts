@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
 
 export const GET = withAuth(async (request: Request, session) => {
@@ -19,14 +19,15 @@ export const GET = withAuth(async (request: Request, session) => {
     }
   }
 
+  const admin = getSupabaseAdmin()
   let result: { data: unknown; error: unknown } | null = null
 
   if (phone) {
-    result = await supabase.from('riders').select('*').eq('phone', phone).single()
+    result = await admin.from('riders').select('*').eq('phone', phone).single()
   } else if (id) {
-    result = await supabase.from('riders').select('*').eq('id', id).single()
+    result = await admin.from('riders').select('*').eq('id', id).single()
   } else {
-    result = await supabase.from('riders').select('*').order('name')
+    result = await admin.from('riders').select('*').order('name')
   }
 
   const data = result?.data
@@ -42,7 +43,8 @@ export const POST = withAuth(async (request: Request) => {
 
   if (!phone) return NextResponse.json({ error: 'กรุณากรอกเบอร์โทร' }, { status: 400 })
 
-  const { data, error } = await supabase
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin
     .from('riders')
     .insert({ phone, name, earnings: 0, jobs_count: 0, online: false })
     .select()

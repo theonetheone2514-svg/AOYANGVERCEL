@@ -3,14 +3,44 @@ import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
 import PwaRegister from "@/components/PwaRegister";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://xn--12cbg6jme3a1d5d.com'
+
 export const metadata: Metadata = {
-  title: "เอาหยังบ่ | สั่งอาหารออนไลน์",
-  description: "สั่งอาหารง่าย ๆ แถวบ้าน เว็บอีสาน กันเอง หิว ๆ",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "เอาหยังบ่ | สั่งอาหารออนไลน์ บ้านสูงเนิน สกลนคร",
+    template: "%s | เอาหยังบ่",
+  },
+  description: "สั่งอาหารง่าย ๆ แถวบ้านสูงเนิน สกลนคร เว็บอีสาน กันเอง หิว ๆ สั่งเลย!",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "เอาหยังบ่",
+  },
+  openGraph: {
+    type: "website",
+    locale: "th_TH",
+    siteName: "เอาหยังบ่",
+    title: "เอาหยังบ่ | สั่งอาหารออนไลน์ บ้านสูงเนิน สกลนคร",
+    description: "สั่งอาหารง่าย ๆ แถวบ้านสูงเนิน สกลนคร เว็บอีสาน กันเอง หิว ๆ สั่งเลย!",
+    url: siteUrl,
+    images: [{ url: "/logo.png", width: 512, height: 512, alt: "เอาหยังบ่ Logo" }],
+  },
+  twitter: {
+    card: "summary",
+    site: "@eaohyangba",
+    title: "เอาหยังบ่ | สั่งอาหารออนไลน์ บ้านสูงเนิน สกลนคร",
+    description: "สั่งอาหารง่าย ๆ แถวบ้านสูงเนิน สกลนคร เว็บอีสาน กันเอง หิว ๆ สั่งเลย!",
+    images: ["/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
+  other: {
+    "google-site-verification": process.env.GOOGLE_SITE_VERIFICATION || "",
   },
 };
 

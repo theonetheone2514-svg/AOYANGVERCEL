@@ -17,7 +17,8 @@ function formatRiderAccepted(body: any): string {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json()
+  let body: any
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
   const lineUserId = process.env.LINE_USER_ID
 

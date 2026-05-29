@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import {
-  replyMessage, pushMessage, textMessage,
+  replyMessage, pushMessage, pushToStore, textMessage,
   storeListFlex, menuFlex, cartFlex, helpMessage,
 } from '@/lib/line'
 import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
+import { generateOtp } from '@/lib/auth'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 
 async function getUserState(lineUserId: string) {
@@ -34,25 +35,106 @@ async function findUserByLineId(lineUserId: string) {
 
 export async function POST(request: Request) {
   const ip = getIp(request)
-  const rl = rateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60_000 })
+  const rl = await rateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60_000 })
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 })
   }
 
-  const body = await request.json()
+  let body: any
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const events = body.events || []
 
   for (const event of events) {
+    const replyToken = event.replyToken
+    const lineUserId = event.source.userId
+
     if (event.type === 'message' && event.message.type === 'text') {
       const text = event.message.text.trim()
-      const replyToken = event.replyToken
-      const lineUserId = event.source.userId
-
       await handleTextMessage(text, replyToken, lineUserId)
+    } else if (event.type === 'message' && event.message.type === 'location') {
+      const { title, address, latitude, longitude } = event.message
+      await handleLocationMessage(replyToken, lineUserId, latitude, longitude, title || address || '')
     }
   }
 
   return NextResponse.json({ success: true })
+}
+
+async function handleLocationMessage(
+  replyToken: string, lineUserId: string,
+  lat: number, lng: number, address: string
+) {
+  const state = await getUserState(lineUserId)
+
+  if (state.step === 'awaiting_address') {
+    state.delivery_lat = lat
+    state.delivery_lng = lng
+    state.delivery_address = address || `(${lat.toFixed(4)}, ${lng.toFixed(4)})`
+    state.step = 'confirm_address'
+    await saveUserState(lineUserId, state)
+
+    const cartTotal = (state.cart || []).reduce((s: number, c: any) => s + c.price * c.qty, 0)
+    return replyMessage(replyToken, [textMessage(
+      `📍 ที่อยู่จัดส่ง:\n${state.delivery_address}\n\n💵 ยอดรวม: ${cartTotal} บาท + ค่าส่ง ${DEFAULT_DELIVERY_FEE} บาท = ${cartTotal + DEFAULT_DELIVERY_FEE} บาท\n\nพิมพ์ "ยืนยัน" เพื่อสั่ง หรือ "ยกเลิก" เพื่อยกเลิก`
+    )])
+  }
+
+  return replyMessage(replyToken, [textMessage('📍 ได้รับพิกัดแล้ว! พิมพ์ "สั่ง" เพื่อเริ่มสั่งอาหาร')])
+}
+
+async function placeOrder(
+  replyToken: string, lineUserId: string, state: any,
+  user: any, storeId: string, cart: any[]
+) {
+  const total = cart.reduce((sum: number, c: any) => sum + c.price * c.qty, 0)
+
+  const { data: order, error } = await supabase
+    .from('orders').insert({
+      customer_id: user.id,
+      store_id: storeId,
+      total: total + DEFAULT_DELIVERY_FEE,
+      delivery_fee: DEFAULT_DELIVERY_FEE,
+      status: 'รอดำเนินการ',
+      lat: state.delivery_lat || null,
+      lng: state.delivery_lng || null,
+      address: state.delivery_address || null,
+    }).select().single()
+
+  if (error || !order) {
+    state.step = null
+    await saveUserState(lineUserId, state)
+    return replyMessage(replyToken, [textMessage('😅 สร้างออเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง')])
+  }
+
+  const orderItems = cart.map((c: any) => ({
+    order_id: order.id,
+    menu_id: c.menu_id,
+    name: c.name,
+    price: c.price,
+    qty: c.qty,
+  }))
+  await supabase.from('order_items').insert(orderItems)
+
+  const savedAddress = state.delivery_address
+
+  state.cart = []
+  state.current_store_id = null
+  state.step = null
+  state.delivery_address = null
+  state.delivery_lat = null
+  state.delivery_lng = null
+  await saveUserState(lineUserId, state)
+
+  const itemsText = orderItems.map((i: any) => `  ${i.qty}x ${i.name}`).join('\n')
+  const msg = textMessage(`🍳 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n📋 เลขที่: ${order.id.slice(0, 8)}\n💵 รวม: ${order.total} บาท\n📍 ${savedAddress || 'ไม่ระบุ'}\n📝 รายการ:\n${itemsText}\n━━━━━━━━━━━━━━`)
+  pushToStore(storeId, [msg])
+  if (process.env.LINE_USER_ID) {
+    pushMessage(process.env.LINE_USER_ID, [msg])
+  }
+
+  return replyMessage(replyToken, [
+    textMessage(`✅ สั่งออเดอร์สำเร็จ!\n━━━━━━━━━━━━━━\n📋 เลขที่ออเดอร์: ${order.id.slice(0, 8)}\n💵 ยอดรวม: ${order.total} บาท\n📍 ${savedAddress || 'ไม่ระบุ'}\n📌 รอเช็คสถานะ พิมพ์ "สถานะ ${order.id.slice(0, 8)}"\n━━━━━━━━━━━━━━\nขอบคุณที่ใช้บริการ 🙏`),
+  ])
 }
 
 async function handleTextMessage(text: string, replyToken: string, lineUserId: string) {
@@ -61,6 +143,76 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
   // Help
   if (text === 'ช่วยเหลือ' || text === 'help') {
     return replyMessage(replyToken, [helpMessage()])
+  }
+
+  // Register: "สมัคร 092XXXXXXX"
+  if (text.startsWith('สมัคร ') || text.startsWith('register ')) {
+    const phone = text.replace(/^(สมัคร|register)\s+/, '').trim()
+    if (!phone || phone.length < 10) {
+      return replyMessage(replyToken, [textMessage('😅 กรุณาพิมพ์ "สมัคร 092XXXXXXX"')])
+    }
+
+    const { data: existing } = await supabase
+      .from('customers').select('id').eq('phone', phone).single()
+    if (existing) {
+      return replyMessage(replyToken, [textMessage('😅 เบอร์นี้ลงทะเบียนแล้ว\nพิมพ์ "ผูก ' + phone + '" เพื่อผูก LINE')])
+    }
+
+    const otp = generateOtp()
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    await supabase.from('otps').upsert(
+      { phone, otp, expires_at: expiresAt, used: false },
+      { onConflict: 'phone' }
+    )
+
+    pushMessage(lineUserId, [
+      textMessage(`🔐 รหัส OTP สำหรับยืนยันเบอร์ ${phone}\n\nรหัส: ${otp}\n\nใช้ได้ 5 นาที`),
+    ])
+
+    state.step = 'register_otp'
+    state.register_phone = phone
+    await saveUserState(lineUserId, state)
+
+    return replyMessage(replyToken, [textMessage(
+      `📱 ส่งรหัส OTP ไปยัง LINE ของคุณแล้ว\nกรุณาพิมพ์รหัส 6 หลักเพื่อยืนยัน\n\nพิมพ์ "ยกเลิก" เพื่อยกเลิก`
+    )])
+  }
+
+  // Handle OTP verification during registration
+  if (state.step === 'register_otp' && /^\d{6}$/.test(text)) {
+    const phone = state.register_phone
+    if (!phone) {
+      state.step = null
+      await saveUserState(lineUserId, state)
+      return replyMessage(replyToken, [textMessage('😅 เกิดข้อผิดพลาด กรุณาเริ่มใหม่ พิมพ์ "สมัคร"')])
+    }
+
+    const { data: otpData } = await supabase
+      .from('otps').select('*')
+      .eq('phone', phone).eq('otp', text).eq('used', false)
+      .single()
+
+    if (!otpData || new Date(otpData.expires_at) < new Date()) {
+      return replyMessage(replyToken, [textMessage('😅 รหัส OTP ไม่ถูกต้องหรือหมดอายุ\nพิมพ์ "สมัคร" เพื่อขอรหัสใหม่')])
+    }
+
+    await supabase.from('otps').update({ used: true }).eq('phone', phone)
+
+    const { data: newCustomer } = await supabase
+      .from('customers').insert({ phone, points: 0, line_user_id: lineUserId })
+      .select().single()
+
+    if (!newCustomer) {
+      return replyMessage(replyToken, [textMessage('😅 สมัครไม่สำเร็จ ลองอีกครั้ง')])
+    }
+
+    state.step = null
+    state.register_phone = null
+    await saveUserState(lineUserId, state)
+
+    return replyMessage(replyToken, [textMessage(
+      `✅ สมัครสมาชิกสำเร็จ!\n\nเบอร์: ${phone}\n\nตอนนี้คุณสามารถสั่งอาหารได้แล้ว 🎉\n\nพิมพ์ "เมนู" เพื่อเริ่มสั่ง`
+    )])
   }
 
   // Link phone: "link 0929892085" or "ผูก 0929892085"
@@ -182,8 +334,38 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
     return replyMessage(replyToken, [cartFlex(cart, total)])
   }
 
-  // Confirm order
-  if (text === 'สั่ง' || text === 'ยืนยันสั่งอาหาร' || text === 'confirm') {
+  // Start order flow: ask for delivery address first
+  if (text === 'สั่ง' || text === 'confirm') {
+    const cart = state.cart || []
+    const storeId = state.current_store_id
+
+    if (!storeId || cart.length === 0) {
+      return replyMessage(replyToken, [textMessage('😅 ตะกร้าว่างหรือยังไม่ได้เลือกร้าน\nพิมพ์ "ตะกร้า" เพื่อดู หรือ "เมนู" เพื่อเลือกร้าน')])
+    }
+
+    const user = await findUserByLineId(lineUserId)
+    if (!user || user.type !== 'customers') {
+      return replyMessage(replyToken, [textMessage('😅 กรุณาผูก LINE กับเบอร์โทรก่อนสั่ง\nพิมพ์ "link 092XXXXXXX" เพื่อผูก')])
+    }
+
+    // Check if delivery address already saved
+    if (state.delivery_address && state.step === 'confirm_address') {
+      // Already have address — proceed to place order
+      return await placeOrder(replyToken, lineUserId, state, user, storeId, cart)
+    }
+
+    // Ask for delivery address
+    state.step = 'awaiting_address'
+    await saveUserState(lineUserId, state)
+
+    const total = cart.reduce((sum: number, c: any) => sum + c.price * c.qty, 0)
+    return replyMessage(replyToken, [textMessage(
+      `📍 กรุณาระบุที่อยู่จัดส่ง\n\nคุณสามารถ:\n• แชร์ตำแหน่งปัจจุบัน (แตะ + → ตำแหน่งที่ตั้ง)\n• หรือพิมพ์ที่อยู่\n\n💵 ยอดรวมอาหาร: ${total} บาท\n🚚 ค่าส่ง: ${DEFAULT_DELIVERY_FEE} บาท\n💰 รวมทั้งหมด: ${total + DEFAULT_DELIVERY_FEE} บาท\n\nพิมพ์ "ยกเลิก" เพื่อยกเลิก`
+    )])
+  }
+
+  // Confirm address and place order
+  if (text === 'ยืนยัน' && state.step === 'confirm_address') {
     const cart = state.cart || []
     const storeId = state.current_store_id
 
@@ -193,45 +375,38 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
 
     const user = await findUserByLineId(lineUserId)
     if (!user || user.type !== 'customers') {
-      return replyMessage(replyToken, [textMessage('😅 กรุณาผูก LINE กับเบอร์โทรก่อนสั่ง\nพิมพ์ "link 092XXXXXXX" เพื่อผูก')])
+      return replyMessage(replyToken, [textMessage('😅 กรุณาผูก LINE กับเบอร์โทรก่อนสั่ง')])
     }
 
-    const total = cart.reduce((sum: number, c: any) => sum + c.price * c.qty, 0)
+    return await placeOrder(replyToken, lineUserId, state, user, storeId, cart)
+  }
 
-    const { data: order, error } = await supabase
-      .from('orders').insert({
-        customer_id: user.id,
-        store_id: storeId,
-        total: total + DEFAULT_DELIVERY_FEE,
-        delivery_fee: DEFAULT_DELIVERY_FEE,
-        status: 'รอดำเนินการ',
-      }).select().single()
+  // Cancel any flow
+  if ((text === 'ยกเลิก' || text === 'cancel') && state.step) {
+    const wasRegister = state.step === 'register_otp'
+    state.step = null
+    state.delivery_address = null
+    state.delivery_lat = null
+    state.delivery_lng = null
+    state.register_phone = null
+    await saveUserState(lineUserId, state)
+    return replyMessage(replyToken, [textMessage(
+      wasRegister
+        ? '✅ ยกเลิกการสมัครแล้ว'
+        : '✅ ยกเลิกการสั่งแล้ว\nพิมพ์ "เมนู" เพื่อเริ่มใหม่'
+    )])
+  }
 
-    if (error || !order) {
-      return replyMessage(replyToken, [textMessage('😅 สร้างออเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง')])
-    }
-
-    const orderItems = cart.map((c: any) => ({
-      order_id: order.id,
-      menu_id: c.menu_id,
-      name: c.name,
-      price: c.price,
-      qty: c.qty,
-    }))
-    await supabase.from('order_items').insert(orderItems)
-
-    state.cart = []
-    state.current_store_id = null
+  // If waiting for address, treat any text as address
+  if (state.step === 'awaiting_address') {
+    state.delivery_address = text
+    state.step = 'confirm_address'
     await saveUserState(lineUserId, state)
 
-    const itemsText = orderItems.map((i: any) => `  ${i.qty}x ${i.name}`).join('\n')
-    pushMessage(process.env.LINE_USER_ID!, [
-      textMessage(`🍳 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n📋 เลขที่: ${order.id.slice(0, 8)}\n💵 รวม: ${order.total} บาท\n📝 รายการ:\n${itemsText}\n━━━━━━━━━━━━━━`),
-    ])
-
-    return replyMessage(replyToken, [
-      textMessage(`✅ สั่งออเดอร์สำเร็จ!\n━━━━━━━━━━━━━━\n📋 เลขที่ออเดอร์: ${order.id.slice(0, 8)}\n💵 ยอดรวม: ${order.total} บาท\n📌 รอเช็คสถานะ พิมพ์ "สถานะ ${order.id.slice(0, 8)}"\n━━━━━━━━━━━━━━\nขอบคุณที่ใช้บริการ 🙏`),
-    ])
+    const cartTotal = (state.cart || []).reduce((s: number, c: any) => s + c.price * c.qty, 0)
+    return replyMessage(replyToken, [textMessage(
+      `📍 ที่อยู่จัดส่ง:\n${text}\n\n💵 ยอดรวมอาหาร: ${cartTotal} บาท\n🚚 ค่าส่ง: ${DEFAULT_DELIVERY_FEE} บาท\n💰 รวมทั้งหมด: ${cartTotal + DEFAULT_DELIVERY_FEE} บาท\n\nพิมพ์ "ยืนยัน" เพื่อสั่ง\nพิมพ์ "ยกเลิก" เพื่อเปลี่ยนที่อยู่`
+    )])
   }
 
   // Check status: "สถานะ xxx"

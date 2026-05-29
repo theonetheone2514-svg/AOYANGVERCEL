@@ -1,12 +1,21 @@
+import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { createSession, getSessionCookieHeaders } from '@/lib/auth'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 import { validate, registerSchema } from '@/lib/validations'
+import { validateOrigin, originError } from '@/lib/csrf'
+
+function hashOtp(phone: string, otp: string): string {
+  return createHash('sha256').update(`${phone}:${otp}`).digest('hex')
+}
 
 export async function POST(request: Request) {
+  if (!validateOrigin(request)) return originError()
+
   const ip = getIp(request)
-  const rl = rateLimit(`register:${ip}`, { maxRequests: 5, windowMs: 60_000 })
+  const rl = await rateLimit(`register:${ip}`, { maxRequests: 5, windowMs: 60_000 })
   if (!rl.allowed) {
     return NextResponse.json({ error: 'โหลดเยอะเกินไป กรุณาลองใหม่ภายหลัง' }, {
       status: 429,
@@ -14,19 +23,19 @@ export async function POST(request: Request) {
     })
   }
 
-  const body = await request.json()
+  let body: unknown
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 }) }
   const validated = validate(registerSchema, body)
   if (validated.error) return validated.error
   const { phone, otp, role } = validated.data!
   const v = validated.data as { phone: string; otp: string; role: 'merchant' | 'rider'; name?: string }
 
-  // Verify OTP
+  // Verify OTP (hashed comparison)
   const { data: otpData } = await supabase
     .from('otps')
     .select('*')
     .eq('phone', phone)
-    .eq('otp', otp)
-    .eq('used', false)
+    .eq('otp', hashOtp(phone, otp))
     .single()
 
   if (!otpData) {
@@ -39,15 +48,17 @@ export async function POST(request: Request) {
 
   await supabase.from('otps').update({ used: true }).eq('phone', phone)
 
+  const admin = getSupabaseAdmin()
+
   // Check phone already registered for this role
   if (role === 'merchant') {
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('stores').select('id').eq('phone', phone).single()
     if (existing) {
       return NextResponse.json({ error: 'เบอร์นี้ลงทะเบียนร้านค้าไว้แล้ว' }, { status: 400 })
     }
   } else {
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('riders').select('id').eq('phone', phone).single()
     if (existing) {
       return NextResponse.json({ error: 'เบอร์นี้ลงทะเบียนไรเดอร์ไว้แล้ว' }, { status: 400 })
@@ -59,7 +70,7 @@ export async function POST(request: Request) {
 
   if (role === 'merchant') {
     // Generate next store ID
-    const { data: maxStore } = await supabase
+    const { data: maxStore } = await admin
       .from('stores')
       .select('id')
       .order('id', { ascending: false })
@@ -68,7 +79,7 @@ export async function POST(request: Request) {
     const nextNum = maxStore ? parseInt(maxStore.id.replace('S', '')) + 1 : 1
     const storeId = `S${String(nextNum).padStart(2, '0')}`
 
-    const { data: store, error } = await supabase
+    const { data: store, error } = await admin
       .from('stores')
       .insert({
         id: storeId,
@@ -85,9 +96,10 @@ export async function POST(request: Request) {
     }
     userId = store.id
   } else {
-    const { zone_id } = body
+    const rawBody = body as Record<string, unknown>
+    const zone_id = rawBody.zone_id as string | undefined
 
-    const { data: rider, error } = await supabase
+    const { data: rider, error } = await admin
       .from('riders')
       .insert({
         name: v.name!,

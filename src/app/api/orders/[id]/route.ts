@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { pushMessage, textMessage } from '@/lib/line'
 import { withAuth } from '@/lib/api-utils'
 import { validate, updateOrderSchema } from '@/lib/validations'
@@ -11,7 +11,8 @@ const STATUS_EMOJI: Record<string, string> = {
 
 async function notifyCustomerOnStatusChange(order: any, newStatus: string) {
   if (!order.customer_id) return
-  const { data: customer } = await supabase
+  const admin = getSupabaseAdmin()
+  const { data: customer } = await admin
     .from('customers').select('line_user_id').eq('id', order.customer_id).single()
   if (!customer?.line_user_id) return
 
@@ -39,8 +40,10 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
   const validated = validate(updateOrderSchema, body)
   if (validated.error) return validated.error
 
+  const admin = getSupabaseAdmin()
+
   if (body.status === 'ยกเลิก') {
-    const { data, error } = await supabase.rpc('cancel_order', {
+    const { data, error } = await admin.rpc('cancel_order', {
       p_order_id: id,
       p_caller_id: session.user_id,
       p_caller_type: session.user_type,
@@ -54,7 +57,7 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
       return NextResponse.json({ error: data.error }, { status })
     }
 
-    const { data: order } = await supabase
+    const { data: order } = await admin
       .from('orders').select('*, items:order_items(*)').eq('id', id).single()
 
     await Promise.all([
@@ -65,7 +68,7 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
     return NextResponse.json(order)
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('orders').update(body).eq('id', id).select('*, items:order_items(*)').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -82,7 +85,8 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
 export const GET = withAuth(async (request: Request, session, params) => {
   const { id } = params!
 
-  const { data, error } = await supabase
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin
     .from('orders').select('*, items:order_items(*)').eq('id', id).single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'ไม่พบออเดอร์' }, { status: 404 })

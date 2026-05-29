@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 export default function MerchantRegisterPage() {
   const router = useRouter()
@@ -24,7 +25,7 @@ export default function MerchantRegisterPage() {
     setSending(true)
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
       body: JSON.stringify({ phone }),
     })
     setSending(false)
@@ -55,7 +56,7 @@ export default function MerchantRegisterPage() {
     setSubmitting(true)
     const res = await fetch('/api/auth/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
       body: JSON.stringify({ phone, otp, role: 'merchant', name: name.trim(), address: address.trim() }),
     })
     setSubmitting(false)

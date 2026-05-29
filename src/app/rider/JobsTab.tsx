@@ -109,38 +109,21 @@ export default function JobsTab({ rider, onUpdate }: Props) {
   }, [loadJobs, rider?.id])
 
   async function acceptJob(orderId: string) {
-    const { data: order } = await supabase
-      .from('orders')
-      .update({ rider_id: rider.id, status: 'กำลังจัดส่ง' })
-      .eq('id', orderId)
-      .is('rider_id', null)
-      .select('*, items:order_items(*), stores(name), customers(name, phone)')
-      .single()
+    const res = await fetch('/api/riders/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId }),
+    })
 
-    if (!order) {
-      alert('⚠️ ออเดอร์นี้มีไรเดอร์รับไปแล้ว')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'เกิดข้อผิดพลาด' }))
+      alert(err.error || '⚠️ ไม่สามารถรับงานได้')
       loadJobs()
       return
     }
 
     await supabase.from('riders').update({ online: true }).eq('id', rider.id)
     onUpdate({ ...rider, online: true })
-
-    // LINE push to admin
-    const items = ((order as any)?.items || []).map((i: any) => `${i.qty}x ${i.name}`).join(', ')
-    await fetch('/api/line/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'rider_accepted',
-        store_name: order.stores?.name || 'ไม่ทราบร้าน',
-        customer_name: order.customers?.name || 'ไม่ทราบชื่อ',
-        customer_phone: order.customers?.phone || '',
-        items: items,
-        total: order.total,
-      }),
-    }).catch(() => {})
-
     loadJobs()
   }
 
@@ -148,26 +131,23 @@ export default function JobsTab({ rider, onUpdate }: Props) {
     if (!confirmOrder) return
     setConfirming(true)
 
-    const orderId = confirmOrder.id
-    const { data: order } = await supabase
-      .from('orders').select('delivery_fee').eq('id', orderId).single()
-    const fee = Number(order?.delivery_fee || 10)
-
-    const { data: current } = await supabase
-      .from('riders').select('earnings, jobs_count').eq('id', rider.id).single()
-
-    await supabase.from('riders').update({
-      earnings: (Number(current?.earnings) || 0) + fee,
-      jobs_count: (current?.jobs_count || 0) + 1,
-    }).eq('id', rider.id)
-
-    await supabase.from('orders').update({ status: 'จัดส่งสำเร็จ' }).eq('id', orderId)
-
-    onUpdate({
-      ...rider,
-      earnings: (Number(current?.earnings) || 0) + fee,
-      jobs_count: (current?.jobs_count || 0) + 1,
+    const res = await fetch('/api/riders/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: confirmOrder.id }),
     })
+
+    if (!res.ok) {
+      alert('⚠️ ยืนยันไม่สำเร็จ ลองใหม่อีกครั้ง')
+      setConfirming(false)
+      return
+    }
+
+    const data = await res.json()
+    if (data.rider) {
+      onUpdate(data.rider)
+    }
+
     setConfirmOrder(null)
     setConfirming(false)
     loadJobs()

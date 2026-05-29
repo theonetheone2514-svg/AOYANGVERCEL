@@ -1,17 +1,5 @@
 import { NextResponse } from 'next/server'
-
-const store = new Map<string, { count: number; resetAt: number }>()
-
-let cleanupInterval: ReturnType<typeof setInterval> | null = null
-function startCleanup() {
-  if (cleanupInterval) return
-  cleanupInterval = setInterval(() => {
-    const now = Date.now()
-    for (const [key, val] of store) {
-      if (val.resetAt <= now) store.delete(key)
-    }
-  }, 60_000)
-}
+import { supabase } from './supabase'
 
 export interface RateLimitConfig {
   maxRequests: number
@@ -26,11 +14,11 @@ export function getIp(request: Request): string {
     || 'unknown'
 }
 
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   config?: Partial<RateLimitConfig>
-): Response | null {
-  const result = rateLimit(key, config)
+): Promise<Response | null> {
+  const result = await rateLimit(key, config)
   if (!result.allowed) {
     return NextResponse.json(
       { error: 'โหลดเยอะเกินไป กรุณาลองใหม่ภายหลัง' },
@@ -40,25 +28,26 @@ export function checkRateLimit(
   return null
 }
 
-export function rateLimit(
+export async function rateLimit(
   key: string,
   config: Partial<RateLimitConfig> = {}
-): { allowed: boolean; remaining: number; retryAfter?: number } {
-  startCleanup()
+): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> {
   const { maxRequests, windowMs } = { ...defaults, ...config }
-  const now = Date.now()
-  const entry = store.get(key)
 
-  if (!entry || entry.resetAt <= now) {
-    store.set(key, { count: 1, resetAt: now + windowMs })
-    return { allowed: true, remaining: maxRequests - 1 }
+  try {
+    const { data, error } = await supabase.rpc('rate_limit_check', {
+      p_key: key,
+      p_max_requests: maxRequests,
+      p_window_ms: windowMs,
+    })
+
+    if (error || !data) {
+      console.error('rate_limit_check error:', error)
+      return { allowed: true, remaining: maxRequests }
+    }
+
+    return data
+  } catch {
+    return { allowed: true, remaining: maxRequests }
   }
-
-  if (entry.count >= maxRequests) {
-    const retryAfter = Math.ceil((entry.resetAt - now) / 1000)
-    return { allowed: false, remaining: 0, retryAfter }
-  }
-
-  entry.count++
-  return { allowed: true, remaining: maxRequests - entry.count }
 }

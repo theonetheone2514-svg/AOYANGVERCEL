@@ -40,12 +40,12 @@ export const sendOtpSchema = z.object({
 
 export const verifyOtpSchema = z.object({
   phone: z.string().regex(/^0\d{9}$/, 'เบอร์โทรไม่ถูกต้อง'),
-  otp: z.string().length(6, 'OTP ต้องมี 6 หลัก'),
+  otp: z.string().regex(/^\d{6}$/, 'OTP ต้องเป็นตัวเลข 6 หลัก'),
 })
 
 export const registerSchema = z.object({
   phone: z.string().regex(/^0\d{9}$/, 'เบอร์โทรไม่ถูกต้อง'),
-  otp: z.string().length(6, 'OTP ต้องมี 6 หลัก'),
+  otp: z.string().regex(/^\d{6}$/, 'OTP ต้องเป็นตัวเลข 6 หลัก'),
   role: z.enum(['merchant', 'rider'], { message: 'บทบาทไม่ถูกต้อง' }),
   name: z.string().min(1, 'กรุณากรอกชื่อ').optional(),
 }).refine(d => {
@@ -69,3 +69,7 @@ export const createStoreSchema = z.object({
   wait_time: z.number().int().min(5).max(120).optional(),
   image_url: z.string().url().optional(),
 })
+
+export const searchSchema = z.string().max(100, 'คำค้นหายาวเกินไป').transform(s =>
+  s.replace(/[<>"'&]/g, '').trim().slice(0, 100)
+)

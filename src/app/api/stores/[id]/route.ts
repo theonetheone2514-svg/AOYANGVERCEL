@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { validateOrigin, originError } from '@/lib/csrf'
+import { withAuth } from '@/lib/api-utils'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -15,21 +18,30 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json({ ...store, menu_items: menu || [] })
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const body = await request.json()
+export const PATCH = withAuth(async (request: Request, session, params) => {
+  const { id } = params!
+  if (session.user_type !== 'admin' && session.user_id !== id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+  }
 
-  const { data, error } = await supabase
+  const body = await request.json()
+  const admin = getSupabaseAdmin()
+
+  const { data, error } = await admin
     .from('stores').update(body).eq('id', id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
-}
+})
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export const DELETE = withAuth(async (request: Request, session, params) => {
+  const { id } = params!
+  if (session.user_type !== 'admin') {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+  }
 
-  // Check for existing orders
-  const { count: orderCount } = await supabase
+  const admin = getSupabaseAdmin()
+
+  const { count: orderCount } = await admin
     .from('orders')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', id)
@@ -41,7 +53,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }, { status: 400 })
   }
 
-  const { error } = await supabase.from('stores').delete().eq('id', id)
+  const { error } = await admin.from('stores').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
-}
+}, ['admin'])

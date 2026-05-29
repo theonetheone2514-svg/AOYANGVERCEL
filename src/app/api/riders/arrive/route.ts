@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const POST = withAuth(async (request: Request, session) => {
+  const limit = await checkRateLimit(`rider-arrive:${session.user_id}`, { maxRequests: 20, windowMs: 60_000 })
+  if (limit) return limit
   const { order_id } = await request.json()
 
   if (!order_id) return NextResponse.json({ error: 'กรุณาระบุออเดอร์' }, { status: 400 })
 
-  const { data: order } = await supabase
+  const admin = getSupabaseAdmin()
+  const { data: order } = await admin
     .from('orders').select('rider_id, status').eq('id', order_id).single()
 
   if (!order) return NextResponse.json({ error: 'ไม่พบออเดอร์' }, { status: 404 })
@@ -18,7 +22,7 @@ export const POST = withAuth(async (request: Request, session) => {
     return NextResponse.json({ error: 'งานนี้ดำเนินการเสร็จสิ้นแล้ว' }, { status: 409 })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('orders').update({ status: 'จัดส่งสำเร็จ' }).eq('id', order_id).eq('rider_id', session.user_id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)

@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { getCsrfHeaders } from './csrf-client'
 
 interface User {
   phone: string
@@ -46,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function sendOtp(phone: string): Promise<boolean> {
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
       body: JSON.stringify({ phone }),
     })
     return res.ok
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(phone: string, otp: string): Promise<boolean> {
     const res = await fetch('/api/auth/verify-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
       body: JSON.stringify({ phone, otp }),
     })
     if (res.ok) {
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST', headers: getCsrfHeaders() })
     setUser(null)
   }
 

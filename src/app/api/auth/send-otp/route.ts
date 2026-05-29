@@ -1,11 +1,17 @@
+import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { generateOtp } from '@/lib/auth'
 import { pushMessage } from '@/lib/line'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 import { validate, sendOtpSchema } from '@/lib/validations'
+import { validateOrigin, originError } from '@/lib/csrf'
 
 const RATE_LIMIT_MS = 60_000
+
+function hashOtp(phone: string, otp: string): string {
+  return createHash('sha256').update(`${phone}:${otp}`).digest('hex')
+}
 
 async function getLineUserId(phone: string): Promise<string | null> {
   for (const table of ['customers', 'stores', 'riders'] as const) {
@@ -20,8 +26,10 @@ async function getLineUserId(phone: string): Promise<string | null> {
 }
 
 export async function POST(request: Request) {
+  if (!validateOrigin(request)) return originError()
+
   const ip = getIp(request)
-  const rl = rateLimit(`send-otp:${ip}`, { maxRequests: 20, windowMs: 60_000 })
+  const rl = await rateLimit(`send-otp:${ip}`, { maxRequests: 5, windowMs: 60_000 })
   if (!rl.allowed) {
     return NextResponse.json({ error: 'โหลดเยอะเกินไป กรุณาลองใหม่ภายหลัง' }, {
       status: 429,
@@ -29,7 +37,8 @@ export async function POST(request: Request) {
     })
   }
 
-  const body = await request.json()
+  let body: unknown
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 }) }
   const validated = validate(sendOtpSchema, body)
   if (validated.error) return validated.error
   const { phone } = validated.data!
@@ -51,7 +60,7 @@ export async function POST(request: Request) {
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
 
   await supabase.from('otps').upsert(
-    { phone, otp, expires_at: expiresAt, used: false },
+    { phone, otp: hashOtp(phone, otp), expires_at: expiresAt, used: false },
     { onConflict: 'phone' }
   )
 
