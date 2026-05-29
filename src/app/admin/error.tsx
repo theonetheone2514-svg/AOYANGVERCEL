@@ -1,6 +1,6 @@
 'use client'
 
-export default function AdminError({ error, reset }: { error: Error; reset: () => void }) {
+export default function AdminError({ error: _error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="min-h-dvh bg-gray-900 flex flex-col items-center justify-center p-4">
       <h1 className="text-4xl font-bold text-red-400">😵 เกิดข้อผิดพลาด</h1>

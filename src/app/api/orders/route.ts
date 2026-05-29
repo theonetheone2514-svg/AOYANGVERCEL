@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { pushMessage, pushToStore, textMessage } from '@/lib/line'
 import { withAuth } from '@/lib/api-utils'

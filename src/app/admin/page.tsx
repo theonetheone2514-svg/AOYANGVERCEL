@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/lib/AuthContext'
+import { useState } from 'react'
 import AuthWrapper from '@/components/AuthWrapper'
 import UserMenu from '@/components/UserMenu'
 import DashboardTab from './DashboardTab'

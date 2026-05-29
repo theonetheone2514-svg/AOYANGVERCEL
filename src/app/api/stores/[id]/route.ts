@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
-import { validateOrigin, originError } from '@/lib/csrf'
 import { withAuth } from '@/lib/api-utils'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
