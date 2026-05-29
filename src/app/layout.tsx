@@ -3,7 +3,7 @@ import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
 import PwaRegister from "@/components/PwaRegister";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://xn--12cbg6jme3a1d5d.com'
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
