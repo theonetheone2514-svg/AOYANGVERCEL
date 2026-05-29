@@ -26,20 +26,21 @@ export function getCsrfTokenFromCookie(cookieString: string | null): string | nu
 export function validateOrigin(request: Request): boolean {
   const origin = request.headers.get('origin')
   const referer = request.headers.get('referer')
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL
   const allowedOrigins = [
-    process.env.NEXT_PUBLIC_SITE_URL,
-    process.env.NEXT_PUBLIC_VERCEL_URL,
-    'https://xn--12cbg6jme3a1d5d.com',
-    'http://localhost:3000',
+    siteUrl,
+    vercelUrl ? `https://${vercelUrl}` : null,
+    process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
   ].filter(Boolean) as string[]
 
-  if (origin && !allowedOrigins.some(a => origin === a || origin.endsWith('/' + a))) {
+  if (origin && !allowedOrigins.includes(origin)) {
     return false
   }
   if (!origin && referer) {
     try {
       const refOrigin = new URL(referer).origin
-      if (!allowedOrigins.some(a => refOrigin === a || refOrigin.endsWith('/' + a))) {
+      if (!allowedOrigins.includes(refOrigin)) {
         return false
       }
     } catch {

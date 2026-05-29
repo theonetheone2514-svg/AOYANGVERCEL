@@ -68,4 +68,4 @@ as $$
   delete from rate_limits where reset_at <= now() - interval '1 hour';
 $$;
 
-grant execute on function rate_limit_cleanup() to anon, authenticated;
+grant execute on function rate_limit_cleanup() to authenticated;

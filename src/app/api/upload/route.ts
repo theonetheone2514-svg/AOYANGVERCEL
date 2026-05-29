@@ -31,8 +31,10 @@ export const POST = withAuth(async (request: Request, session) => {
     return NextResponse.json({ error: 'ไม่พบไฟล์' }, { status: 400 })
   }
 
-  if (!file.type.startsWith('image/')) {
-    return NextResponse.json({ error: 'รองรับเฉพาะไฟล์รูปภาพ' }, { status: 400 })
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return NextResponse.json({ error: 'รองรับเฉพาะไฟล์ JPG, PNG, WebP, GIF, AVIF' }, { status: 400 })
   }
 
   if (file.size > 5 * 1024 * 1024) {

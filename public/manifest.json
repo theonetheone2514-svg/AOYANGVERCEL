@@ -8,16 +8,19 @@
   "theme_color": "#9C4A35",
   "orientation": "portrait-primary",
   "scope": "/",
+  "lang": "th",
+  "dir": "ltr",
+  "categories": ["food", "ordering"],
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/logo.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
