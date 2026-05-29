@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import EmptyState from '@/components/EmptyState'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -29,11 +29,12 @@ export default function MenuTab({ storeId }: Props) {
 
   const load = useCallback(async () => {
     if (!storeId) return
-    const { data } = await supabase
-      .from('menu_items').select('*').eq('store_id', storeId).order('category').order('name')
+    const res = await fetch(`/api/menu?store_id=${storeId}`)
+    if (!res.ok) return
+    const data: any[] = await res.json()
     if (data) {
       setItems(data)
-      const cats = [...new Set(data.map((i) => i.category).filter(Boolean))]
+      const cats = [...new Set(data.map((i: any) => i.category).filter(Boolean))] as string[]
       setCategories(cats)
     }
     setLoading(false)
@@ -49,28 +50,42 @@ export default function MenuTab({ storeId }: Props) {
 
   async function addItem() {
     if (!form.name || !form.price) return
-    const { data } = await supabase.from('menu_items').insert({
-      store_id: storeId,
-      name: form.name,
-      price: Number(form.price),
-      category: form.category || null,
-      stock: Number(form.stock),
-      image_url: form.image_url || null,
-    }).select().single()
-    if (data) setItems((prev) => [...prev, data])
+    const res = await fetch('/api/menu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify({
+        store_id: storeId,
+        name: form.name,
+        price: Number(form.price),
+        category: form.category || null,
+        stock: Number(form.stock),
+        image_url: form.image_url || null,
+      }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setItems((prev) => [...prev, data])
+    }
     resetForm()
   }
 
   async function saveEdit() {
     if (!editId || !form.name || !form.price) return
-    const { data } = await supabase.from('menu_items').update({
-      name: form.name,
-      price: Number(form.price),
-      category: form.category || null,
-      stock: Number(form.stock),
-      image_url: form.image_url || null,
-    }).eq('id', editId).select().single()
-    if (data) setItems((prev) => prev.map((i) => (i.id === editId ? data : i)))
+    const res = await fetch(`/api/menu/${editId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify({
+        name: form.name,
+        price: Number(form.price),
+        category: form.category || null,
+        stock: Number(form.stock),
+        image_url: form.image_url || null,
+      }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setItems((prev) => prev.map((i) => (i.id === editId ? data : i)))
+    }
     resetForm()
   }
 
@@ -88,14 +103,21 @@ export default function MenuTab({ storeId }: Props) {
 
   async function deleteItem() {
     if (!deleteTarget) return
-    await supabase.from('menu_items').delete().eq('id', deleteTarget.id)
+    await fetch(`/api/menu/${deleteTarget.id}`, {
+      method: 'DELETE',
+      headers: { ...getCsrfHeaders() },
+    })
     setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id))
     setDeleteTarget(null)
   }
 
   async function updateStock(item: any, delta: number) {
     const newStock = Math.max(0, (item.stock ?? 0) + delta)
-    await supabase.from('menu_items').update({ stock: newStock }).eq('id', item.id)
+    await fetch(`/api/menu/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify({ stock: newStock }),
+    })
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, stock: newStock } : i)))
   }
 

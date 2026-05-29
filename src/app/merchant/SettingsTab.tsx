@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface Props {
   store: any
@@ -14,13 +14,21 @@ export default function SettingsTab({ store, onUpdate }: Props) {
 
   async function toggleStatus() {
     const newStatus = store.status === 'open' ? 'closed' : 'open'
-    await supabase.from('stores').update({ status: newStatus }).eq('id', store.id)
+    await fetch(`/api/stores/${store.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify({ status: newStatus }),
+    })
     onUpdate({ ...store, status: newStatus })
   }
 
   async function saveWaitTime() {
     setSaving(true)
-    await supabase.from('stores').update({ wait_time: waitTime }).eq('id', store.id)
+    await fetch(`/api/stores/${store.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify({ wait_time: waitTime }),
+    })
     onUpdate({ ...store, wait_time: waitTime })
     setSaving(false)
   }

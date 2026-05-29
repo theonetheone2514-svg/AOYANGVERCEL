@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice, getElapsedMinutes, getStatusColor, cn } from '@/lib/utils'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 import { showOrderToast } from '@/components/Toast'
 import EmptyState from '@/components/EmptyState'
 import { StatsCardSkeleton } from '@/components/Skeleton'
@@ -103,7 +104,11 @@ export default function OrdersTab({ storeId }: Props) {
   }, [loadOrders, storeId])
 
   async function updateStatus(orderId: string, status: string) {
-    await supabase.from('orders').update({ status }).eq('id', orderId)
+    await fetch(`/api/orders/${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify({ status }),
+    })
   }
 
   const filteredOrders = filter === 'all'
