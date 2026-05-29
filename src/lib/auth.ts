@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { cookies } from 'next/headers'
 import { supabase } from './supabase'
 
@@ -51,6 +52,10 @@ export function generateToken(): string {
 
 export function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
+}
+
+export function hashOtp(phone: string, otp: string): string {
+  return createHash('sha256').update(`${phone}:${otp}`).digest('hex')
 }
 
 export async function createSession(

@@ -1,16 +1,11 @@
-import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
-import { createSession, getSessionCookieHeaders } from '@/lib/auth'
+import { createSession, getSessionCookieHeaders, hashOtp } from '@/lib/auth'
 import { ADMIN_PHONES } from '@/lib/constants'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 import { validate, verifyOtpSchema } from '@/lib/validations'
 import { validateOrigin, originError } from '@/lib/csrf'
-
-function hashOtp(phone: string, otp: string): string {
-  return createHash('sha256').update(`${phone}:${otp}`).digest('hex')
-}
 
 export async function POST(request: Request) {
   if (!validateOrigin(request)) return originError()

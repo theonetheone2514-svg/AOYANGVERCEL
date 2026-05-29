@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { supabase } from '@/lib/supabase'
 import {
   replyMessage, pushMessage, pushToStore, textMessage,
   storeListFlex, menuFlex, cartFlex, helpMessage,
 } from '@/lib/line'
 import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
-import { generateOtp } from '@/lib/auth'
+import { generateOtp, hashOtp } from '@/lib/auth'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 
 async function getUserState(lineUserId: string) {
@@ -38,6 +39,19 @@ export async function POST(request: Request) {
   const rl = await rateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60_000 })
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 })
+  }
+
+  const channelSecret = process.env.LINE_CHANNEL_SECRET
+  if (channelSecret) {
+    const rawBody = await request.clone().text()
+    const signature = request.headers.get('X-Line-Signature') || ''
+    const expected = crypto
+      .createHmac('SHA256', channelSecret)
+      .update(rawBody)
+      .digest('base64')
+    if (signature !== expected) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
   }
 
   let body: any
@@ -161,7 +175,7 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
     const otp = generateOtp()
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
     await supabase.from('otps').upsert(
-      { phone, otp, expires_at: expiresAt, used: false },
+      { phone, otp: hashOtp(phone, otp), expires_at: expiresAt, used: false },
       { onConflict: 'phone' }
     )
 
@@ -189,7 +203,7 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
 
     const { data: otpData } = await supabase
       .from('otps').select('*')
-      .eq('phone', phone).eq('otp', text).eq('used', false)
+      .eq('phone', phone).eq('otp', hashOtp(phone, text)).eq('used', false)
       .single()
 
     if (!otpData || new Date(otpData.expires_at) < new Date()) {

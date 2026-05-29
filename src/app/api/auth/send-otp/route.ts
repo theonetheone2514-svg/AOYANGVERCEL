@@ -1,17 +1,12 @@
-import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { generateOtp } from '@/lib/auth'
+import { generateOtp, hashOtp } from '@/lib/auth'
 import { pushMessage } from '@/lib/line'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 import { validate, sendOtpSchema } from '@/lib/validations'
 import { validateOrigin, originError } from '@/lib/csrf'
 
 const RATE_LIMIT_MS = 60_000
-
-function hashOtp(phone: string, otp: string): string {
-  return createHash('sha256').update(`${phone}:${otp}`).digest('hex')
-}
 
 async function getLineUserId(phone: string): Promise<string | null> {
   for (const table of ['customers', 'stores', 'riders'] as const) {
