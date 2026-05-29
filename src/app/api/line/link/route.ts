@@ -2,18 +2,17 @@ import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { validate, lineLinkSchema } from '@/lib/validations'
 
 export const POST = withAuth(async (request: Request, session) => {
   const limit = await checkRateLimit(`link:${session.user_id}`, { maxRequests: 10, windowMs: 60_000 })
   if (limit) return limit
 
   const body = await request.json()
-  const { line_user_id } = body
+  const parsed = validate(lineLinkSchema, body)
+  if (parsed.error) return parsed.error
 
-  if (!line_user_id) {
-    return NextResponse.json({ error: 'กรุณาระบุ LINE user ID' }, { status: 400 })
-  }
-
+  const { line_user_id } = parsed.data
   const phone = session.phone
   const admin = getSupabaseAdmin()
 

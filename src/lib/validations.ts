@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 
-export function validate<T>(schema: z.ZodSchema<T>, data: unknown): { data?: T; error?: Response } {
+export function validate<T>(schema: z.ZodSchema<T>, data: unknown): { data: T; error?: undefined } | { data?: undefined; error: Response } {
   const result = schema.safeParse(data)
   if (!result.success) {
     const firstIssue = result.error.issues[0]
@@ -73,3 +73,47 @@ export const createStoreSchema = z.object({
 export const searchSchema = z.string().max(100, 'คำค้นหายาวเกินไป').transform(s =>
   s.replace(/[<>"'&]/g, '').trim().slice(0, 100)
 )
+
+const phoneSchema = z.string().regex(/^0\d{9}$/, 'เบอร์โทรไม่ถูกต้อง')
+
+export const updateStoreSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: phoneSchema.optional(),
+  status: z.enum(['open', 'closed']).optional(),
+  wait_time: z.number().int().min(5).max(120).optional(),
+  image_url: z.string().url().optional(),
+  line_user_id: z.string().optional(),
+})
+
+export const updateRiderSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: phoneSchema.optional(),
+  status: z.enum(['available', 'busy', 'offline']).optional(),
+  line_user_id: z.string().optional(),
+})
+
+export const createCustomerSchema = z.object({
+  phone: phoneSchema,
+  name: z.string().optional(),
+  points: z.number().int().min(0).optional(),
+})
+
+export const updatePointsSchema = z.object({
+  customer_id: z.string().min(1, 'กรุณาระบุลูกค้า'),
+  points: z.number().int('คะแนนต้องเป็นตัวเลข'),
+})
+
+export const createRiderSchema = z.object({
+  phone: phoneSchema,
+  name: z.string().min(1, 'กรุณากรอกชื่อ'),
+})
+
+export const updateSettingsSchema = z.record(z.string(), z.unknown())
+
+export const lineLinkSchema = z.object({
+  line_user_id: z.string().min(1, 'กรุณาระบุ LINE userId'),
+})
+
+export const orderIdSchema = z.object({
+  order_id: z.string().uuid('รูปแบบ order_id ไม่ถูกต้อง'),
+})

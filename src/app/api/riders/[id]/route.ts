@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
+import { validate, updateRiderSchema } from '@/lib/validations'
 
 export const GET = withAuth(async (request: Request, session, params) => {
   const { id } = params!
@@ -19,9 +20,12 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
   }
   const body = await request.json()
+  const parsed = validate(updateRiderSchema, body)
+  if (parsed.error) return parsed.error
+
   const admin = getSupabaseAdmin()
   const { data, error } = await admin
-    .from('riders').update(body).eq('id', id).select().single()
+    .from('riders').update(parsed.data).eq('id', id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 })

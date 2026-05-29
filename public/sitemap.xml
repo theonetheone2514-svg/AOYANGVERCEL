@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://xn--12cbg6jme3a1d5d.com/</loc>
+    <loc>https://webtea-next.vercel.app/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://xn--12cbg6jme3a1d5d.com/auth/login</loc>
+    <loc>https://webtea-next.vercel.app/auth/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://xn--12cbg6jme3a1d5d.com/about</loc>
+    <loc>https://webtea-next.vercel.app/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>

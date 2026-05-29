@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
+import { validate, createRiderSchema } from '@/lib/validations'
 
 export const GET = withAuth(async (request: Request, session) => {
   const { searchParams } = new URL(request.url)
@@ -39,14 +40,13 @@ export const GET = withAuth(async (request: Request, session) => {
 
 export const POST = withAuth(async (request: Request) => {
   const body = await request.json()
-  const { phone, name } = body
-
-  if (!phone) return NextResponse.json({ error: 'กรุณากรอกเบอร์โทร' }, { status: 400 })
+  const parsed = validate(createRiderSchema, body)
+  if (parsed.error) return parsed.error
 
   const admin = getSupabaseAdmin()
   const { data, error } = await admin
     .from('riders')
-    .insert({ phone, name, earnings: 0, jobs_count: 0, online: false })
+    .insert({ ...parsed.data, earnings: 0, jobs_count: 0, online: false })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

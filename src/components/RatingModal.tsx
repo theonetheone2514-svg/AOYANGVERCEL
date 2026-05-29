@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Star } from 'lucide-react'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface Props {
   orderId: string
@@ -22,7 +23,7 @@ export default function RatingModal({ orderId, storeId, customerId, onClose, onD
     setSubmitting(true)
     await fetch('/api/ratings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
       body: JSON.stringify({ order_id: orderId, customer_id: customerId, store_id: storeId, rating, review }),
     })
     setSubmitting(false)

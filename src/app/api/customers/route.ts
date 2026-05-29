@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
+import { validate, createCustomerSchema } from '@/lib/validations'
 
 export const GET = withAuth(async (request: Request, session) => {
   const { searchParams } = new URL(request.url)
@@ -27,14 +28,13 @@ export const GET = withAuth(async (request: Request, session) => {
 
 export const POST = withAuth(async (request: Request) => {
   const body = await request.json()
-  const { phone, name } = body
-
-  if (!phone) return NextResponse.json({ error: 'กรุณากรอกเบอร์โทร' }, { status: 400 })
+  const parsed = validate(createCustomerSchema, body)
+  if (parsed.error) return parsed.error
 
   const admin = getSupabaseAdmin()
   const { data, error } = await admin
     .from('customers')
-    .insert({ phone, name })
+    .insert(parsed.data)
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

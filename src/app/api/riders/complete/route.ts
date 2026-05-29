@@ -3,20 +3,19 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { pushMessage, pushToStore, pushToCustomer, textMessage } from '@/lib/line'
 import { withAuth } from '@/lib/api-utils'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { validate, orderIdSchema } from '@/lib/validations'
 
 export const POST = withAuth(async (request: Request, session) => {
   const limit = await checkRateLimit(`rider-complete:${session.user_id}`, { maxRequests: 10, windowMs: 60_000 })
   if (limit) return limit
-  const { order_id } = await request.json()
-
-  if (!order_id) {
-    return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 })
-  }
+  const body = await request.json()
+  const parsed = validate(orderIdSchema, body)
+  if (parsed.error) return parsed.error
 
   const admin = getSupabaseAdmin()
 
   const { data, error } = await admin.rpc('complete_order', {
-    p_order_id: order_id,
+    p_order_id: parsed.data.order_id,
     p_rider_id: session.user_id,
   })
 
@@ -32,7 +31,7 @@ export const POST = withAuth(async (request: Request, session) => {
   }
 
   const [updatedOrder, rider] = await Promise.all([
-    admin.from('orders').select('*').eq('id', order_id).single(),
+    admin.from('orders').select('*').eq('id', parsed.data.order_id).single(),
     admin.from('riders').select('*').eq('id', session.user_id).single(),
   ])
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { withAuth } from '@/lib/api-utils'
+import { validate, updateStoreSchema } from '@/lib/validations'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,10 +25,12 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
   }
 
   const body = await request.json()
-  const admin = getSupabaseAdmin()
+  const parsed = validate(updateStoreSchema, body)
+  if (parsed.error) return parsed.error
 
+  const admin = getSupabaseAdmin()
   const { data, error } = await admin
-    .from('stores').update(body).eq('id', id).select().single()
+    .from('stores').update(parsed.data).eq('id', id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 })
