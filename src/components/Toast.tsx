@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Bell } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
 interface ToastData {
   id: string
@@ -21,7 +21,6 @@ export default function ToastContainer() {
 
   useEffect(() => {
     const handler = (data: ToastData) => {
-      const id = Date.now().toString()
       setToasts((prev) => [...prev, { ...data, showing: true }])
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== data.id))
