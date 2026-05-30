@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatPrice, calculateCommission, netAfterCommission, isInZone, distanceKm, snapToRadius, getStatusColor, getElapsedMinutes } from './utils'
+import { formatPrice, calculateCommission, netAfterCommission, distanceKm, snapToRadius, getStatusColor, getElapsedMinutes, findZoneId } from './utils'
 
 describe('formatPrice', () => {
   it('formats price with two decimals', () => {
@@ -27,19 +27,22 @@ describe('netAfterCommission', () => {
   })
 })
 
-describe('isInZone', () => {
-  const center = { lat: 17.293067, lng: 103.969910 }
+describe('findZoneId', () => {
+  const zones = [
+    { id: 'Z01', lat: 17.293067, lng: 103.969910, radius: 5 },
+    { id: 'Z02', lat: 17.31, lng: 103.99, radius: 3 },
+  ]
 
-  it('returns true for a point at the center', () => {
-    expect(isInZone(center.lat, center.lng, center.lat, center.lng, 5)).toBe(true)
+  it('finds the correct zone for a point at center', () => {
+    expect(findZoneId(17.293067, 103.969910, zones)).toBe('Z01')
   })
 
-  it('returns true for a close point (~2km away)', () => {
-    expect(isInZone(17.31, 103.97, center.lat, center.lng, 5)).toBe(true)
+  it('finds the correct zone for a point within radius', () => {
+    expect(findZoneId(17.31, 103.97, zones)).toBe('Z01')
   })
 
-  it('returns false for a far point (~100km away)', () => {
-    expect(isInZone(18.0, 104.0, center.lat, center.lng, 5)).toBe(false)
+  it('returns null for a point outside all zones', () => {
+    expect(findZoneId(18.0, 104.0, zones)).toBeNull()
   })
 })
 

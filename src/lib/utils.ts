@@ -44,25 +44,6 @@ export function getElapsedMinutes(dateString: string): number {
   return Math.floor((now.getTime() - created.getTime()) / 60000)
 }
 
-export function isInZone(
-  lat: number,
-  lng: number,
-  zoneLat: number,
-  zoneLng: number,
-  radiusKm: number
-): boolean {
-  const R = 6371
-  const dLat = ((lat - zoneLat) * Math.PI) / 180
-  const dLng = ((lng - zoneLng) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((zoneLat * Math.PI) / 180) *
-      Math.cos((lat * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c <= radiusKm
-}
-
 export function cn(...classes: (string | false | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ')
 }
@@ -80,6 +61,19 @@ export function distanceKm(lat1: number, lng1: number, lat2: number, lng2: numbe
       Math.sin(dLng / 2) ** 2
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return R * c
+}
+
+export function findZoneId(
+  lat: number,
+  lng: number,
+  zones: { id: string; lat: number; lng: number; radius: number }[]
+): string | null {
+  for (const zone of zones) {
+    if (distanceKm(lat, lng, zone.lat, zone.lng) <= zone.radius) {
+      return zone.id
+    }
+  }
+  return null
 }
 
 export function snapToRadius(

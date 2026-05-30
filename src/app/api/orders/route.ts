@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/api-utils'
 import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { validate, createOrderSchema } from '@/lib/validations'
+import { findZoneId } from '@/lib/utils'
 
 export const POST = withAuth(async (request: Request, session) => {
   const limit = await checkRateLimit(`order:${session.user_id}`, { maxRequests: 10, windowMs: 60_000 })
@@ -32,6 +33,12 @@ export const POST = withAuth(async (request: Request, session) => {
 
   const df = delivery_fee ?? DEFAULT_DELIVERY_FEE
 
+  let zoneId: string | null = null
+  if (lat && lng) {
+    const { data: zones } = await admin.from('zones').select('id, lat, lng, radius')
+    if (zones) zoneId = findZoneId(lat, lng, zones)
+  }
+
   const { data, error } = await admin.rpc('place_order', {
     p_customer_id: session.user_id,
     p_store_id: store_id,
@@ -47,6 +54,7 @@ export const POST = withAuth(async (request: Request, session) => {
     p_address: address ?? null,
     p_note: note ?? null,
     p_payment_method: payment_method || 'cash',
+    p_zone_id: zoneId,
   })
 
   if (error) {

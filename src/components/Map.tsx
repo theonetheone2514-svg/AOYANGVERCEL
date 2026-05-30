@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import type { Zone } from '@/lib/types'
 import { DEFAULT_LOCATION, MAX_DELIVERY_KM, distanceKm, snapToRadius } from '@/lib/utils'
@@ -18,6 +18,16 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
   const mapRef = useRef<L.Map | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const popupRef = useRef<L.Popup | null>(null)
+  const [deliveryRadius, setDeliveryRadius] = useState(MAX_DELIVERY_KM)
+
+  useEffect(() => {
+    fetch('/api/settings/radius')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.radius) setDeliveryRadius(data.radius)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (mapContainerRef.current && !mapRef.current) {
@@ -46,7 +56,7 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
     if (!map) return
 
     const circle = L.circle([CENTER.lat, CENTER.lng], {
-      radius: MAX_DELIVERY_KM * 1000,
+      radius: deliveryRadius * 1000,
       color: '#E65100',
       fillColor: '#E65100',
       fillOpacity: 0.08,
@@ -69,7 +79,7 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
       map.removeLayer(circle)
       map.removeLayer(centerMarker)
     }
-  }, [readOnly])
+  }, [readOnly, deliveryRadius])
 
   // Zone circles
   useEffect(() => {
@@ -110,10 +120,10 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
         popupRef.current = null
       }
 
-      if (dist > MAX_DELIVERY_KM) {
+      if (dist > deliveryRadius) {
         popupRef.current = L.popup()
           .setLatLng([lat, lng])
-          .setContent(`📍 อยู่นอกรัศมีการจัดส่ง<br/><small>สูงสุด ${MAX_DELIVERY_KM} กม. จากบ้านสูงเนิน</small>`)
+          .setContent(`📍 อยู่นอกรัศมีการจัดส่ง<br/><small>สูงสุด ${deliveryRadius} กม. จากบ้านสูงเนิน</small>`)
           .openOn(map)
         return
       }
@@ -125,7 +135,7 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
     return () => {
       map.off('click', handler)
     }
-  }, [onClick, readOnly])
+  }, [onClick, readOnly, deliveryRadius])
 
   // Selected location marker with drag bound
   useEffect(() => {
@@ -145,13 +155,13 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
           if (!pos || !onClick) return
 
           const dist = distanceKm(pos.lat, pos.lng, CENTER.lat, CENTER.lng)
-          if (dist > MAX_DELIVERY_KM) {
-            const snapped = snapToRadius(pos.lat, pos.lng, CENTER.lat, CENTER.lng, MAX_DELIVERY_KM)
+          if (dist > deliveryRadius) {
+            const snapped = snapToRadius(pos.lat, pos.lng, CENTER.lat, CENTER.lng, deliveryRadius)
             marker?.setLatLng([snapped.lat, snapped.lng])
             onClick(snapped.lat, snapped.lng)
             popupRef.current = L.popup()
               .setLatLng([snapped.lat, snapped.lng])
-              .setContent(`📍 snap กลับขอบเขตจัดส่ง<br/><small>สูงสุด ${MAX_DELIVERY_KM} กม.</small>`)
+              .setContent(`📍 snap กลับขอบเขตจัดส่ง<br/><small>สูงสุด ${deliveryRadius} กม.</small>`)
               .openOn(map)
           } else {
             onClick(pos.lat, pos.lng)
@@ -163,7 +173,7 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
     return () => {
       if (marker) map.removeLayer(marker)
     }
-  }, [selectedLocation, onClick, readOnly])
+  }, [selectedLocation, onClick, readOnly, deliveryRadius])
 
   return <div ref={mapContainerRef} className="w-full h-full" />
 }

@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 export default function RidersTab() {
   const [riders, setRiders] = useState<any[]>([])
   const [deactivatedMap, setDeactivatedMap] = useState<Record<string, boolean>>({})
+  const [zoneMap, setZoneMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [confirm, setConfirm] = useState<{
     action: 'deactivate' | 'delete'
@@ -19,10 +20,17 @@ export default function RidersTab() {
   const [success, setSuccess] = useState('')
 
   const load = useCallback(async () => {
-    const [{ data: riderData }, { data: settings }] = await Promise.all([
+    const [{ data: riderData }, { data: settings }, { data: zones }] = await Promise.all([
       supabase.from('riders').select('*').order('name'),
       supabase.from('settings').select('key, value').like('key', 'deactivated_rider:%'),
+      supabase.from('zones').select('id, name'),
     ])
+
+    const zMap: Record<string, string> = {}
+    if (zones) {
+      for (const z of zones) zMap[z.id] = z.name
+    }
+    setZoneMap(zMap)
     const map: Record<string, boolean> = {}
     if (settings) {
       for (const s of settings) {
@@ -118,7 +126,7 @@ export default function RidersTab() {
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">{r.phone}</div>
                     <div className="text-xs text-gray-400">
-                      {r.jobs_count || 0} งาน | {r.zone_id ? `โซน ${r.zone_id}` : 'ไม่มีโซน'}
+                      {r.jobs_count || 0} งาน | {r.zone_id ? `โซน ${zoneMap[r.zone_id] || r.zone_id}` : 'ไม่มีโซน'}
                     </div>
                   </div>
                   <div className="text-right shrink-0 ml-2">

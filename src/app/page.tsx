@@ -36,6 +36,7 @@ export default function Home() {
   const [zones, setZones] = useState<Zone[]>([])
   const [storeRatings, setStoreRatings] = useState<Record<string, { average: number; count: number }>>({})
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [deliveryAddress, setDeliveryAddress] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ทั้งหมด')
 
@@ -194,8 +195,8 @@ export default function Home() {
       router.push('/auth/login?redirect=/')
       return
     }
-    if (!selectedLocation) {
-      alert('กรุณาเลือกพิกัดจัดส่งบนแผนที่')
+    if (!selectedLocation && !deliveryAddress.trim()) {
+      alert('กรุณาระบุที่อยู่จัดส่ง (ปักหมุดบนแผนที่ หรือกรอกที่อยู่)')
       return
     }
     if (!selectedStore) return
@@ -207,6 +208,12 @@ export default function Home() {
       qty,
     }))
 
+    const orderLat = selectedLocation?.lat ?? DEFAULT_LOCATION.lat
+    const orderLng = selectedLocation?.lng ?? DEFAULT_LOCATION.lng
+    const orderAddress = deliveryAddress.trim() || (selectedLocation
+      ? `${DEFAULT_LOCATION.address} (${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)})`
+      : DEFAULT_LOCATION.address)
+
     const res = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
@@ -214,9 +221,9 @@ export default function Home() {
         store_id: selectedStore.id,
         items,
         delivery_fee: 10,
-        lat: selectedLocation.lat,
-        lng: selectedLocation.lng,
-        address: DEFAULT_LOCATION.address,
+        lat: orderLat,
+        lng: orderLng,
+        address: orderAddress,
         payment_method: paymentMethod,
       }),
     })
@@ -265,27 +272,35 @@ export default function Home() {
       </header>
 
       <main className="flex-1 px-4 space-y-4 -mt-6 relative z-20">
-        {/* Map toggle */}
-        <button
-          onClick={() => setShowMap(!showMap)}
-          className={`w-full rounded-2xl border px-4 py-3 flex items-center justify-between transition hover:shadow-md ${
-            selectedLocation
-              ? 'bg-white shadow-sm border-gray-100'
-              : 'bg-orange-50 border-orange-200 shadow-sm'
-          }`}
-        >
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className={`w-4 h-4 ${selectedLocation ? 'text-[#E65100]' : 'text-orange-500'}`} />
-            <span className={selectedLocation ? 'text-gray-600' : 'text-orange-700 font-medium'}>
-              {selectedLocation ? `📍 ${DEFAULT_LOCATION.address}` : '📍 เลือกพิกัดจัดส่ง'}
-            </span>
+        {/* Delivery address section */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-[#E65100]" />
+            <span className="text-sm font-medium text-gray-700">ที่อยู่จัดส่ง</span>
           </div>
-          {showMap ? (
-            <ChevronUp className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          )}
-        </button>
+          <textarea
+            value={deliveryAddress}
+            onChange={(e) => setDeliveryAddress(e.target.value)}
+            placeholder="กรอกที่อยู่จัดส่ง (บ้านเลขที่, ถนน, หมู่, ตำบล...)"
+            rows={2}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#E65100]/30 focus:border-[#E65100]"
+          />
+          <button
+            onClick={() => setShowMap(!showMap)}
+            className={`w-full rounded-2xl border px-4 py-3 flex items-center justify-between transition hover:shadow-md text-sm ${
+              selectedLocation
+                ? 'bg-white shadow-sm border-gray-100'
+                : 'bg-orange-50 border-orange-200 shadow-sm'
+            }`}
+          >
+            <span className={selectedLocation ? 'text-gray-600' : 'text-orange-700 font-medium'}>
+              {selectedLocation
+                ? `📍 ปักหมุดแล้ว (${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)})`
+                : '📍 หรือปักหมุดบนแผนที่'}
+            </span>
+            {showMap ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </button>
+        </div>
 
         {showMap && (
           <>
@@ -297,7 +312,7 @@ export default function Home() {
               />
             </section>
             {selectedLocation && (
-              <div className="bg-orange-50 rounded-xl px-4 py-2.5 border border-orange-100 flex items-center gap-2 text-sm">
+              <div className="bg-orange-50 rounded-xl px-4 py-2 border border-orange-100 flex items-center gap-2 text-sm">
                 <span className="text-lg">📍</span>
                 <span className="text-gray-600 text-xs">
                   ({selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)})

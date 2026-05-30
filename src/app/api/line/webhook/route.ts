@@ -8,6 +8,7 @@ import {
 import { DEFAULT_DELIVERY_FEE } from '@/lib/constants'
 import { generateOtp, hashOtp } from '@/lib/auth'
 import { rateLimit, getIp } from '@/lib/rate-limit'
+import { distanceKm, DEFAULT_LOCATION, MAX_DELIVERY_KM, findZoneId } from '@/lib/utils'
 
 async function getUserState(lineUserId: string) {
   const { data } = await supabase
@@ -74,10 +75,27 @@ export async function POST(request: Request) {
   return NextResponse.json({ success: true })
 }
 
+async function getDeliveryRadius(): Promise<number> {
+  const { data } = await supabase
+    .from('settings')
+    .select('value')
+    .eq('key', 'radius')
+    .single()
+  return data?.value ? parseFloat(data.value) : MAX_DELIVERY_KM
+}
+
 async function handleLocationMessage(
   replyToken: string, lineUserId: string,
   lat: number, lng: number, address: string
 ) {
+  const radius = await getDeliveryRadius()
+  const dist = distanceKm(lat, lng, DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lng)
+  if (dist > radius) {
+    return replyMessage(replyToken, [textMessage(
+      `📍 พิกัดของคุณอยู่นอกรัศมีการจัดส่ง (สูงสุด ${radius} กม. จากบ้านสูงเนิน)\n\nกรุณาระบุที่อยู่ในเขตจัดส่ง`
+    )])
+  }
+
   const state = await getUserState(lineUserId)
 
   if (state.step === 'awaiting_address') {
@@ -102,6 +120,12 @@ async function placeOrder(
 ) {
   const total = cart.reduce((sum: number, c: any) => sum + c.price * c.qty, 0)
 
+  let zoneId: string | null = null
+  if (state.delivery_lat && state.delivery_lng) {
+    const { data: zones } = await supabase.from('zones').select('id, lat, lng, radius')
+    if (zones) zoneId = findZoneId(state.delivery_lat, state.delivery_lng, zones)
+  }
+
   const { data: order, error } = await supabase
     .from('orders').insert({
       customer_id: user.id,
@@ -112,6 +136,7 @@ async function placeOrder(
       lat: state.delivery_lat || null,
       lng: state.delivery_lng || null,
       address: state.delivery_address || null,
+      zone_id: zoneId,
     }).select().single()
 
   if (error || !order) {
