@@ -45,6 +45,12 @@ export default function Home() {
     setSearch(parsed.success ? parsed.data : '')
   }
   const [showMap, setShowMap] = useState(false)
+  const hasSavedLocation = useRef(false)
+
+  useEffect(() => {
+    if (!showMap || hasSavedLocation.current) return
+    setSelectedLocation({ lat: DEFAULT_LOCATION.lat, lng: DEFAULT_LOCATION.lng })
+  }, [showMap])
   const [customerPoints, setCustomerPoints] = useState(0)
   const prevCount = useRef(0)
   const [bounce, setBounce] = useState(false)
@@ -74,6 +80,7 @@ export default function Home() {
         .maybeSingle()
       if (loc) {
         setSelectedLocation({ lat: loc.lat!, lng: loc.lng! })
+        hasSavedLocation.current = true
       }
     })()
   }, [user])
@@ -303,7 +310,7 @@ export default function Home() {
 
         {showMap && (
           <>
-            <section className="bg-white rounded-2xl shadow-sm overflow-hidden h-72 border border-gray-100">
+            <section className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-[35vh] border border-gray-100">
               <MapView
                 zones={zones}
                 selectedLocation={selectedLocation}

@@ -40,6 +40,7 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
       }).addTo(mapRef.current)
+      mapRef.current.invalidateSize()
     }
 
     return () => {
@@ -147,6 +148,12 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
     if (selectedLocation) {
       marker = L.marker([selectedLocation.lat, selectedLocation.lng], {
         draggable: !readOnly,
+        icon: L.divIcon({
+          className: 'bg-transparent',
+          html: '<span style="font-size:24px">📍</span>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 24],
+        }),
       }).addTo(map)
 
       if (!readOnly) {
