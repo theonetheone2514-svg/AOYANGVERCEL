@@ -157,7 +157,6 @@ export default function Home() {
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     setSelectedLocation({ lat, lng })
-    setShowMap(false)
   }, [])
 
   const filteredStores = useMemo(() => {
@@ -304,7 +303,7 @@ export default function Home() {
 
         {showMap && (
           <>
-            <section className="bg-white rounded-2xl shadow-sm overflow-hidden h-48 border border-gray-100">
+            <section className="bg-white rounded-2xl shadow-sm overflow-hidden h-72 border border-gray-100">
               <MapView
                 zones={zones}
                 selectedLocation={selectedLocation}
