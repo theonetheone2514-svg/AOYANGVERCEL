@@ -55,7 +55,11 @@ export default function Home() {
   const [customerPoints, setCustomerPoints] = useState(0)
   const prevCount = useRef(0)
   const [bounce, setBounce] = useState(false)
-  const greeting = getIsanGreeting()
+  const [greeting, setGreeting] = useState({ header: '', sub: '' })
+
+  useEffect(() => {
+    setGreeting(getIsanGreeting())
+  }, [])
 
   useEffect(() => {
     Promise.all([loadStores(), loadZones()])
@@ -265,10 +269,12 @@ export default function Home() {
             </div>
             <UserMenu />
           </div>
-          <div className="text-center my-4">
-            <p className="text-base font-bold drop-shadow-sm">{greeting.header}</p>
-            <p className="text-sm text-orange-100 mt-1">{greeting.sub}</p>
-          </div>
+          {greeting.header && (
+            <div className="text-center my-4">
+              <p className="text-base font-bold drop-shadow-sm">{greeting.header}</p>
+              <p className="text-sm text-orange-100 mt-1">{greeting.sub}</p>
+            </div>
+          )}
           <SearchBar
             value={search}
             onChange={setSanitizedSearch}

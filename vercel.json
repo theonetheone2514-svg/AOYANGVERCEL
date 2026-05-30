@@ -4,5 +4,11 @@
       "path": "/api/cron/rate-limit-cleanup",
       "schedule": "0 0 * * *"
     }
+  ],
+  "overrides": [
+    {
+      "path": "sw.js",
+      "contentType": "application/javascript"
+    }
   ]
 }
