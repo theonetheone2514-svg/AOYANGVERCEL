@@ -1,4 +1,10 @@
 {
+  "routes": [
+    {
+      "src": "/sw.js",
+      "dest": "/sw.js"
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/rate-limit-cleanup",
