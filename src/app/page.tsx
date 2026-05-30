@@ -45,12 +45,13 @@ export default function Home() {
     setSearch(parsed.success ? parsed.data : '')
   }
   const [showMap, setShowMap] = useState(false)
-  const hasSavedLocation = useRef(false)
 
-  useEffect(() => {
-    if (!showMap || hasSavedLocation.current) return
-    setSelectedLocation({ lat: DEFAULT_LOCATION.lat, lng: DEFAULT_LOCATION.lng })
-  }, [showMap])
+  const toggleMap = useCallback(() => {
+    if (!showMap && !selectedLocation) {
+      setSelectedLocation({ lat: DEFAULT_LOCATION.lat, lng: DEFAULT_LOCATION.lng })
+    }
+    setShowMap((prev) => !prev)
+  }, [showMap, selectedLocation])
   const [customerPoints, setCustomerPoints] = useState(0)
   const prevCount = useRef(0)
   const [bounce, setBounce] = useState(false)
@@ -80,7 +81,6 @@ export default function Home() {
         .maybeSingle()
       if (loc) {
         setSelectedLocation({ lat: loc.lat!, lng: loc.lng! })
-        hasSavedLocation.current = true
       }
     })()
   }, [user])
@@ -292,7 +292,7 @@ export default function Home() {
             className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#E65100]/30 focus:border-[#E65100]"
           />
           <button
-            onClick={() => setShowMap(!showMap)}
+            onClick={toggleMap}
             className={`w-full rounded-2xl border px-4 py-3 flex items-center justify-between transition hover:shadow-md text-sm ${
               selectedLocation
                 ? 'bg-white shadow-sm border-gray-100'

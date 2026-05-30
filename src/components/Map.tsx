@@ -40,7 +40,7 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
       }).addTo(mapRef.current)
-      mapRef.current.invalidateSize()
+      setTimeout(() => mapRef.current?.invalidateSize(), 0)
     }
 
     return () => {
@@ -65,20 +65,8 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
       dashArray: '8, 8',
     }).addTo(map)
 
-    // Center marker
-    const centerMarker = L.marker([CENTER.lat, CENTER.lng], {
-      icon: L.divIcon({
-        className: 'bg-transparent',
-        html: '<span style="font-size:24px">📍</span>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 24],
-      }),
-      interactive: false,
-    }).addTo(map)
-
     return () => {
       map.removeLayer(circle)
-      map.removeLayer(centerMarker)
     }
   }, [readOnly, deliveryRadius])
 
@@ -149,10 +137,10 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
       marker = L.marker([selectedLocation.lat, selectedLocation.lng], {
         draggable: !readOnly,
         icon: L.divIcon({
-          className: 'bg-transparent',
-          html: '<span style="font-size:24px">📍</span>',
-          iconSize: [24, 24],
-          iconAnchor: [12, 24],
+          className: '',
+          html: '<div style="background:#E65100;width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;border-radius:50%;background:#fff;"></div></div>',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
         }),
       }).addTo(map)
 
