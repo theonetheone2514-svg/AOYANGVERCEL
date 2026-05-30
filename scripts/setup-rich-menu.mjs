@@ -84,7 +84,7 @@ async function main() {
       },
       {
         bounds: { x: 1250, y: 843, width: 1250, height: 843 },
-        action: { type: 'uri', uri: process.env.LIFF_URL || 'https://liff.line.me/เปลี่ยนเป็นLIFF_IDจริง', label: 'เปิดเว็บ' },
+        action: { type: 'uri', uri: process.env.LIFF_URL || 'https://liff.line.me/2010238144-nlZyKc4P', label: 'เปิดเว็บ' },
       },
     ],
   }
