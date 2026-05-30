@@ -214,11 +214,11 @@ export default function Home() {
       qty,
     }))
 
-    const orderLat = selectedLocation?.lat ?? DEFAULT_LOCATION.lat
-    const orderLng = selectedLocation?.lng ?? DEFAULT_LOCATION.lng
+    const orderLat = selectedLocation?.lat ?? null
+    const orderLng = selectedLocation?.lng ?? null
     const orderAddress = deliveryAddress.trim() || (selectedLocation
       ? `${DEFAULT_LOCATION.address} (${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)})`
-      : DEFAULT_LOCATION.address)
+      : '')
 
     const res = await fetch('/api/orders', {
       method: 'POST',
@@ -310,7 +310,7 @@ export default function Home() {
 
         {showMap && (
           <>
-            <section className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-[35vh] border border-gray-100">
+            <section className="bg-white rounded-2xl shadow-sm overflow-hidden h-56 border border-gray-100">
               <MapView
                 zones={zones}
                 selectedLocation={selectedLocation}

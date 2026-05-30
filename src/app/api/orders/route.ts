@@ -78,7 +78,7 @@ export const POST = withAuth(async (request: Request, session) => {
       lat,
       lng,
       address: address ?? null,
-    }).maybeSingle()
+    }, { onConflict: 'customer_id' }).maybeSingle()
   }
 
   const itemsText = order.items.map((i: { name: string; price: number; qty: number }) =>

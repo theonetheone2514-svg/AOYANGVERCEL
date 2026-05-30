@@ -118,43 +118,33 @@ async function placeOrder(
   replyToken: string, lineUserId: string, state: any,
   user: any, storeId: string, cart: any[]
 ) {
-  const total = cart.reduce((sum: number, c: any) => sum + c.price * c.qty, 0)
-
   let zoneId: string | null = null
   if (state.delivery_lat && state.delivery_lng) {
     const { data: zones } = await supabase.from('zones').select('id, lat, lng, radius')
     if (zones) zoneId = findZoneId(state.delivery_lat, state.delivery_lng, zones)
   }
 
-  const { data: order, error } = await supabase
-    .from('orders').insert({
-      customer_id: user.id,
-      store_id: storeId,
-      total: total + DEFAULT_DELIVERY_FEE,
-      delivery_fee: DEFAULT_DELIVERY_FEE,
-      status: 'รอดำเนินการ',
-      lat: state.delivery_lat || null,
-      lng: state.delivery_lng || null,
-      address: state.delivery_address || null,
-      zone_id: zoneId,
-    }).select().single()
+  const savedAddress = state.delivery_address
 
-  if (error || !order) {
-    state.step = null
-    await saveUserState(lineUserId, state)
-    return replyMessage(replyToken, [textMessage('😅 สร้างออเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง')])
-  }
-
-  const orderItems = cart.map((c: any) => ({
-    order_id: order.id,
+  const p_items = cart.map((c: any) => ({
     menu_id: c.menu_id,
     name: c.name,
     price: c.price,
     qty: c.qty,
   }))
-  await supabase.from('order_items').insert(orderItems)
 
-  const savedAddress = state.delivery_address
+  const { data: rpcResult, error } = await supabase.rpc('place_order', {
+    p_customer_id: user.id,
+    p_store_id: storeId,
+    p_items: p_items,
+    p_delivery_fee: DEFAULT_DELIVERY_FEE,
+    p_lat: state.delivery_lat ?? null,
+    p_lng: state.delivery_lng ?? null,
+    p_address: state.delivery_address ?? null,
+    p_note: null,
+    p_payment_method: 'cash',
+    p_zone_id: zoneId,
+  })
 
   state.cart = []
   state.current_store_id = null
@@ -164,7 +154,15 @@ async function placeOrder(
   state.delivery_lng = null
   await saveUserState(lineUserId, state)
 
-  const itemsText = orderItems.map((i: any) => `  ${i.qty}x ${i.name}`).join('\n')
+  if (error || !rpcResult || rpcResult.ok === false) {
+    return replyMessage(replyToken, [textMessage(
+      '😅 สร้างออเดอร์ไม่สำเร็จ: ' + (rpcResult?.error || error?.message || 'ลองใหม่อีกครั้ง')
+    )])
+  }
+
+  const order = rpcResult.order
+
+  const itemsText = order.items.map((i: any) => `  ${i.qty}x ${i.name}`).join('\n')
   const msg = textMessage(`🍳 ออเดอร์ใหม่!\n━━━━━━━━━━━━━━\n📋 เลขที่: ${order.id.slice(0, 8)}\n💵 รวม: ${order.total} บาท\n📍 ${savedAddress || 'ไม่ระบุ'}\n📝 รายการ:\n${itemsText}\n━━━━━━━━━━━━━━`)
   pushToStore(storeId, [msg])
   if (process.env.LINE_USER_ID) {

@@ -110,9 +110,11 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
       }
 
       if (dist > deliveryRadius) {
+        const snapped = snapToRadius(lat, lng, CENTER.lat, CENTER.lng, deliveryRadius)
+        onClick(snapped.lat, snapped.lng)
         popupRef.current = L.popup()
-          .setLatLng([lat, lng])
-          .setContent(`📍 อยู่นอกรัศมีการจัดส่ง<br/><small>สูงสุด ${deliveryRadius} กม. จากบ้านสูงเนิน</small>`)
+          .setLatLng([snapped.lat, snapped.lng])
+          .setContent(`📍 snap กลับขอบเขตจัดส่ง<br/><small>สูงสุด ${deliveryRadius} กม. จากบ้านสูงเนิน</small>`)
           .openOn(map)
         return
       }
@@ -127,46 +129,75 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
   }, [onClick, readOnly, deliveryRadius])
 
   // Selected location marker with drag bound
+  const markerRef = useRef<L.Marker | null>(null)
+  const prevLocationRef = useRef<string>('')
+
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    let marker: L.Marker | null = null
+    const locationKey = selectedLocation ? `${selectedLocation.lat},${selectedLocation.lng}` : ''
 
-    if (selectedLocation) {
-      marker = L.marker([selectedLocation.lat, selectedLocation.lng], {
-        draggable: !readOnly,
-        icon: L.divIcon({
-          className: '',
-          html: '<div style="background:#E65100;width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;border-radius:50%;background:#fff;"></div></div>',
-          iconSize: [30, 30],
-          iconAnchor: [15, 15],
-        }),
-      }).addTo(map)
-
-      if (!readOnly) {
-        marker.on('dragend', () => {
-          const pos = marker?.getLatLng()
-          if (!pos || !onClick) return
-
-          const dist = distanceKm(pos.lat, pos.lng, CENTER.lat, CENTER.lng)
-          if (dist > deliveryRadius) {
-            const snapped = snapToRadius(pos.lat, pos.lng, CENTER.lat, CENTER.lng, deliveryRadius)
-            marker?.setLatLng([snapped.lat, snapped.lng])
-            onClick(snapped.lat, snapped.lng)
-            popupRef.current = L.popup()
-              .setLatLng([snapped.lat, snapped.lng])
-              .setContent(`📍 snap กลับขอบเขตจัดส่ง<br/><small>สูงสุด ${deliveryRadius} กม.</small>`)
-              .openOn(map)
-          } else {
-            onClick(pos.lat, pos.lng)
-          }
-        })
+    if (!selectedLocation) {
+      if (markerRef.current) {
+        map.removeLayer(markerRef.current)
+        markerRef.current = null
       }
+      prevLocationRef.current = ''
+      return
+    }
+
+    const coords: [number, number] = [selectedLocation.lat, selectedLocation.lng]
+
+    if (markerRef.current && locationKey === prevLocationRef.current) {
+      return
+    }
+
+    if (markerRef.current) {
+      markerRef.current.setLatLng(coords)
+      prevLocationRef.current = locationKey
+      return
+    }
+
+    markerRef.current = L.marker(coords, {
+      draggable: !readOnly,
+      icon: L.icon({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+      }),
+    }).addTo(map)
+
+    prevLocationRef.current = locationKey
+
+    if (!readOnly) {
+      markerRef.current.on('dragend', () => {
+        const pos = markerRef.current?.getLatLng()
+        if (!pos || !onClick) return
+
+        const dist = distanceKm(pos.lat, pos.lng, CENTER.lat, CENTER.lng)
+        if (dist > deliveryRadius) {
+          const snapped = snapToRadius(pos.lat, pos.lng, CENTER.lat, CENTER.lng, deliveryRadius)
+          markerRef.current?.setLatLng([snapped.lat, snapped.lng])
+          onClick(snapped.lat, snapped.lng)
+          popupRef.current = L.popup()
+            .setLatLng([snapped.lat, snapped.lng])
+            .setContent(`📍 snap กลับขอบเขตจัดส่ง<br/><small>สูงสุด ${deliveryRadius} กม.</small>`)
+            .openOn(map)
+        } else {
+          onClick(pos.lat, pos.lng)
+        }
+      })
     }
 
     return () => {
-      if (marker) map.removeLayer(marker)
+      if (markerRef.current) {
+        map.removeLayer(markerRef.current)
+        markerRef.current = null
+        prevLocationRef.current = ''
+      }
     }
   }, [selectedLocation, onClick, readOnly, deliveryRadius])
 

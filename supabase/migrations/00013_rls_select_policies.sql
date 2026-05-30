@@ -22,7 +22,7 @@ create policy "settings_public_select" on settings
 
 drop policy if exists "customer_locations_public_select" on customer_locations;
 create policy "customer_locations_public_select" on customer_locations
-  for select using (true);
+  for select using (customer_id = auth.uid());
 
 drop policy if exists "order_items_public_select" on order_items;
 create policy "order_items_public_select" on order_items
