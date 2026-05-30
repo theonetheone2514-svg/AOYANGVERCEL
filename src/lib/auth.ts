@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes, randomInt } from 'node:crypto'
 import { cookies } from 'next/headers'
 import { supabase } from './supabase'
 
@@ -42,16 +42,11 @@ export async function requireAuth(allowedRoles?: UserType[]): Promise<SessionInf
 }
 
 export function generateToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let token = ''
-  for (let i = 0; i < 64; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return token
+  return randomBytes(32).toString('base64url')
 }
 
 export function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  return randomInt(100000, 1000000).toString()
 }
 
 export function hashOtp(phone: string, otp: string): string {

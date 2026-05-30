@@ -1,5 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
+function generateNonce(): string {
+  const array = new Uint8Array(16)
+  crypto.getRandomValues(array)
+  return btoa(String.fromCharCode(...array))
+}
+
 const publicPaths = [
   '/',
   '/auth/login',
@@ -30,7 +36,24 @@ export async function middleware(request: NextRequest) {
     pathname === '/icon.svg'
 
   if (isPublic) {
-    return NextResponse.next()
+    const nonce = generateNonce()
+    const csp = [
+      "default-src 'self'",
+      `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https:",
+      "frame-src 'none'",
+      "object-src 'none'",
+    ].join('; ')
+
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-nonce', nonce)
+
+    const response = NextResponse.next({ request: { headers: requestHeaders } })
+    response.headers.set('Content-Security-Policy', csp)
+    return response
   }
 
   const token = request.cookies.get('session_token')?.value
@@ -77,7 +100,24 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next()
+  const nonce = generateNonce()
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https:",
+    "frame-src 'none'",
+    "object-src 'none'",
+  ].join('; ')
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  response.headers.set('Content-Security-Policy', csp)
+  return response
 }
 
 export const config = {

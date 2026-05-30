@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from './supabase'
+import { logger } from './logger'
 
 export interface RateLimitConfig {
   maxRequests: number
@@ -42,12 +43,12 @@ export async function rateLimit(
     })
 
     if (error || !data) {
-      console.error('rate_limit_check error:', error)
-      return { allowed: true, remaining: maxRequests }
+      logger.error('rate_limit_check failed', { error: String(error) })
+      return { allowed: false, remaining: 0, retryAfter: 60 }
     }
 
     return data
   } catch {
-    return { allowed: true, remaining: maxRequests }
+    return { allowed: false, remaining: 0, retryAfter: 60 }
   }
 }

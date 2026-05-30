@@ -43,16 +43,19 @@ export async function POST(request: Request) {
   }
 
   const channelSecret = process.env.LINE_CHANNEL_SECRET
-  if (channelSecret) {
-    const rawBody = await request.clone().text()
-    const signature = request.headers.get('X-Line-Signature') || ''
-    const expected = crypto
-      .createHmac('SHA256', channelSecret)
-      .update(rawBody)
-      .digest('base64')
-    if (signature !== expected) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    }
+  if (!channelSecret) {
+    console.error('[LINE] LINE_CHANNEL_SECRET is not configured — rejecting webhook for security')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  }
+
+  const rawBody = await request.clone().text()
+  const signature = request.headers.get('X-Line-Signature') || ''
+  const expected = crypto
+    .createHmac('SHA256', channelSecret)
+    .update(rawBody)
+    .digest('base64')
+  if (signature !== expected) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   let body: any
