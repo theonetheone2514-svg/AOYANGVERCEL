@@ -161,12 +161,11 @@ export default function Map({ zones = [], selectedLocation, onClick, readOnly }:
 
     markerRef.current = L.marker(coords, {
       draggable: !readOnly,
-      icon: L.icon({
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
+      icon: L.divIcon({
+        className: '',
+        html: '<svg width="30" height="45" viewBox="0 0 30 45" fill="none"><path d="M15 0C6.716 0 0 6.716 0 15c0 11.25 15 29 15 29s15-17.75 15-29C30 6.716 23.284 0 15 0z" fill="#E65100" stroke="white" stroke-width="2"/><circle cx="15" cy="14" r="7" fill="white"/></svg>',
+        iconSize: [30, 45],
+        iconAnchor: [15, 45],
       }),
     }).addTo(map)
 
