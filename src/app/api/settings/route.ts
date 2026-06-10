@@ -3,8 +3,10 @@ import { supabase } from '@/lib/supabase'
 import { withAuth } from '@/lib/api-utils'
 import { validate, updateSettingsSchema } from '@/lib/validations'
 
+const PUBLIC_SETTINGS = ['radius', 'site_name', 'site_url']
+
 export async function GET() {
-  const { data, error } = await supabase.from('settings').select('*')
+  const { data, error } = await supabase.from('settings').select('*').in('key', PUBLIC_SETTINGS)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const settings: Record<string, string> = {}
   data?.forEach((s: { key: string; value: string }) => { settings[s.key] = s.value })

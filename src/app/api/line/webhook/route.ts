@@ -259,26 +259,67 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
   if (text.startsWith('link ') || text.startsWith('ผูก ')) {
     const phone = text.replace(/^(link|ผูก)\s+/, '').trim()
     if (!phone || phone.length < 10) {
-      return replyMessage(replyToken, [textMessage('😅 กรุณาพิมพ์ "link 092XXXXXXX" หรือ "ผูก 092XXXXXXX"')])
+      return replyMessage(replyToken, [textMessage('😅 กรุณาพิมพ์ "ผูก 092XXXXXXX"')])
     }
 
-    const { data: customer } = await supabase
-      .from('customers').select('id').eq('phone', phone).single()
-    const { data: store } = await supabase
-      .from('stores').select('id').eq('phone', phone).single()
-    const { data: rider } = await supabase
-      .from('riders').select('id').eq('phone', phone).single()
+    const { data: customer } = await supabase.from('customers').select('id').eq('phone', phone).single()
+    const { data: store } = await supabase.from('stores').select('id').eq('phone', phone).single()
+    const { data: rider } = await supabase.from('riders').select('id').eq('phone', phone).single()
 
     if (!customer && !store && !rider) {
       return replyMessage(replyToken, [textMessage('😅 ไม่พบเบอร์โทรนี้ในระบบ กรุณาลงทะเบียนก่อน')])
     }
 
+    const otp = generateOtp()
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    await supabase.from('otps').upsert(
+      { phone, otp: hashOtp(phone, otp), expires_at: expiresAt, used: false },
+      { onConflict: 'phone' }
+    )
+
+    pushMessage(lineUserId, [
+      textMessage(`🔐 รหัส OTP สำหรับผูก LINE กับเบอร์ ${phone}\n\nรหัส: ${otp}\n\nใช้ได้ 5 นาที`),
+    ])
+
+    state.step = 'link_otp'
+    state.link_phone = phone
+    await saveUserState(lineUserId, state)
+
+    return replyMessage(replyToken, [textMessage('📱 ส่งรหัส OTP ไปยัง LINE ของคุณแล้ว\nกรุณาพิมพ์รหัส 6 หลักเพื่อยืนยัน')])
+  }
+
+  // Handle OTP verification during link
+  if (state.step === 'link_otp' && /^\d{6}$/.test(text)) {
+    const phone = state.link_phone
+    if (!phone) {
+      state.step = null
+      await saveUserState(lineUserId, state)
+      return replyMessage(replyToken, [textMessage('😅 เกิดข้อผิดพลาด กรุณาเริ่มใหม่ พิมพ์ "ผูก เบอร์โทร"')])
+    }
+
+    const { data: otpData } = await supabase
+      .from('otps').select('*')
+      .eq('phone', phone).eq('otp', hashOtp(phone, text)).eq('used', false)
+      .single()
+
+    if (!otpData || new Date(otpData.expires_at) < new Date()) {
+      return replyMessage(replyToken, [textMessage('😅 รหัส OTP ไม่ถูกต้องหรือหมดอายุ\nพิมพ์ "ผูก ' + phone + '" ใหม่')])
+    }
+
+    await supabase.from('otps').update({ used: true }).eq('phone', phone)
+
+    const { data: customer } = await supabase.from('customers').select('id').eq('phone', phone).single()
+    const { data: store } = await supabase.from('stores').select('id').eq('phone', phone).single()
+    const { data: rider } = await supabase.from('riders').select('id').eq('phone', phone).single()
     if (customer) await supabase.from('customers').update({ line_user_id: lineUserId }).eq('id', customer.id)
     if (store) await supabase.from('stores').update({ line_user_id: lineUserId }).eq('id', store.id)
     if (rider) await supabase.from('riders').update({ line_user_id: lineUserId }).eq('id', rider.id)
 
-    return replyMessage(replyToken, [textMessage(`✅ ผูก LINE กับเบอร์ ${phone} สำเร็จ!\nต่อจากนี้ OTP จะส่งมาให้คุณโดยตรง`)])
+    state.step = null
+    state.link_phone = null
+    await saveUserState(lineUserId, state)
 
+    return replyMessage(replyToken, [textMessage(`✅ ผูก LINE กับเบอร์ ${phone} สำเร็จ!\nต่อจากนี้ OTP จะส่งมาให้คุณโดยตรง`)])
   }
 
   // Unlink: "unlink" or "เลิกผูก"
@@ -424,16 +465,20 @@ async function handleTextMessage(text: string, replyToken: string, lineUserId: s
   // Cancel any flow
   if ((text === 'ยกเลิก' || text === 'cancel') && state.step) {
     const wasRegister = state.step === 'register_otp'
+    const wasLink = state.step === 'link_otp'
     state.step = null
     state.delivery_address = null
     state.delivery_lat = null
     state.delivery_lng = null
     state.register_phone = null
+    state.link_phone = null
     await saveUserState(lineUserId, state)
     return replyMessage(replyToken, [textMessage(
       wasRegister
         ? '✅ ยกเลิกการสมัครแล้ว'
-        : '✅ ยกเลิกการสั่งแล้ว\nพิมพ์ "เมนู" เพื่อเริ่มใหม่'
+        : wasLink
+          ? '✅ ยกเลิกการผูก LINE แล้ว'
+          : '✅ ยกเลิกการสั่งแล้ว\nพิมพ์ "เมนู" เพื่อเริ่มใหม่'
     )])
   }
 

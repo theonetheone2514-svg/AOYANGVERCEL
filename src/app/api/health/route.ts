@@ -8,6 +8,5 @@ export async function GET() {
     status: error ? 'degraded' : 'ok',
     database: error ? 'unreachable' : 'connected',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
   })
 }

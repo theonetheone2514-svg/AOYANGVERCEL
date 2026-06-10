@@ -5,6 +5,8 @@ export interface Store {
   status: 'open' | 'closed'
   wait_time: number
   image_url?: string
+  line_user_id?: string
+  active?: boolean
   created_at: string
 }
 
@@ -33,6 +35,7 @@ export interface Order {
   payment_method: 'cash' | 'transfer'
   zone_id?: string
   note?: string
+  idempotency_key?: string
   created_at: string
 }
 
@@ -59,6 +62,7 @@ export interface Customer {
   phone: string
   name?: string
   points: number
+  line_user_id?: string
   created_at: string
 }
 
@@ -71,6 +75,10 @@ export interface Rider {
   jobs_count: number
   zone_id?: string
   online: boolean
+  lat?: number
+  lng?: number
+  line_user_id?: string
+  active?: boolean
   created_at: string
 }
 

@@ -88,7 +88,7 @@ export const updateStoreSchema = z.object({
 export const updateRiderSchema = z.object({
   name: z.string().min(1).optional(),
   phone: phoneSchema.optional(),
-  status: z.enum(['available', 'busy', 'offline']).optional(),
+  online: z.boolean().optional(),
   line_user_id: z.string().optional(),
 })
 

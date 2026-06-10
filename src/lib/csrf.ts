@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 
 const CSRF_COOKIE = 'csrf_token'
 const CSRF_HEADER = 'x-csrf-token'
@@ -63,5 +63,8 @@ export function validateCsrfToken(request: Request): boolean {
   const tokenCookie = getCsrfTokenFromCookie(cookieHeader)
   const tokenHeader = request.headers.get(CSRF_HEADER)
   if (!tokenCookie || !tokenHeader) return false
-  return createHash('sha256').update(tokenCookie).digest('hex') === createHash('sha256').update(tokenHeader).digest('hex')
+  const a = Buffer.from(createHash('sha256').update(tokenCookie).digest('hex'))
+  const b = Buffer.from(createHash('sha256').update(tokenHeader).digest('hex'))
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
 }

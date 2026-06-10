@@ -68,6 +68,19 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
     return NextResponse.json(order)
   }
 
+  const { data: existingOrder } = await admin.from('orders').select('store_id, rider_id, customer_id').eq('id', id).single()
+  if (!existingOrder) return NextResponse.json({ error: 'ไม่พบออเดอร์' }, { status: 404 })
+
+  if (session.user_type === 'merchant') {
+    const { data: store } = await admin.from('stores').select('id').eq('user_id', session.user_id).single()
+    if (!store || store.id !== existingOrder.store_id) {
+      return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 })
+    }
+  }
+  if (session.user_type === 'rider' && existingOrder.rider_id !== session.user_id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 })
+  }
+
   const { data, error } = await admin
     .from('orders').update(body).eq('id', id).select('*, items:order_items(*)').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -90,5 +103,19 @@ export const GET = withAuth(async (request: Request, session, params) => {
     .from('orders').select('*, items:order_items(*)').eq('id', id).single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'ไม่พบออเดอร์' }, { status: 404 })
+
+  if (session.user_type === 'customer' && data.customer_id !== session.user_id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+  }
+  if (session.user_type === 'merchant') {
+    const { data: store } = await admin.from('stores').select('id').eq('user_id', session.user_id).single()
+    if (!store || store.id !== data.store_id) {
+      return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+    }
+  }
+  if (session.user_type === 'rider' && data.rider_id !== session.user_id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์เข้าถึง' }, { status: 403 })
+  }
+
   return NextResponse.json(data)
 })
