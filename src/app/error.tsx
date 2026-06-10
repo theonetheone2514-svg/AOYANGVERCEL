@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
 
 export default function Error({ error, reset }: { error: Error; reset: () => void }) {
   useEffect(() => {
-    console.error(JSON.stringify({ level: 'error', message: error.message, stack: error.stack, timestamp: new Date().toISOString() }))
+    Sentry.captureException(error)
   }, [error])
   return (
     <div className="min-h-dvh bg-[#FFF8E7] flex flex-col items-center justify-center p-4">

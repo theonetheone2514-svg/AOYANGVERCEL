@@ -16,6 +16,7 @@ import { DEFAULT_LOCATION } from '@/lib/utils'
 import { getIsanGreeting } from '@/lib/greeting'
 import { searchSchema } from '@/lib/validations'
 import { getCsrfHeaders } from '@/lib/csrf-client'
+import { showToast } from '@/components/Toast'
 import { MapPin, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
 
@@ -45,6 +46,7 @@ export default function Home() {
     setSearch(parsed.success ? parsed.data : '')
   }
   const [showMap, setShowMap] = useState(false)
+  const [deliveryFee, setDeliveryFee] = useState(10)
 
   const toggleMap = useCallback(() => {
     if (!showMap && !selectedLocation) {
@@ -62,8 +64,16 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    Promise.all([loadStores(), loadZones()])
+    Promise.all([loadStores(), loadZones(), loadSettings()])
   }, [])
+
+  async function loadSettings() {
+    const { data } = await supabase.from('settings').select('key, value')
+    if (data) {
+      const fee = data.find((s) => s.key === 'delivery_fee')
+      if (fee) setDeliveryFee(Number(fee.value) || 10)
+    }
+  }
 
   // Load saved location + points for logged-in user
   useEffect(() => {
@@ -206,7 +216,7 @@ export default function Home() {
       return
     }
     if (!selectedLocation && !deliveryAddress.trim()) {
-      alert('กรุณาระบุที่อยู่จัดส่ง (ปักหมุดบนแผนที่ หรือกรอกที่อยู่)')
+      showToast('กรุณาระบุที่อยู่จัดส่ง (ปักหมุดบนแผนที่ หรือกรอกที่อยู่)', 'error')
       return
     }
     if (!selectedStore) return
@@ -230,7 +240,7 @@ export default function Home() {
       body: JSON.stringify({
         store_id: selectedStore.id,
         items,
-        delivery_fee: 10,
+        delivery_fee: deliveryFee,
         lat: orderLat,
         lng: orderLng,
         address: orderAddress,
@@ -240,13 +250,13 @@ export default function Home() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'เกิดข้อผิดพลาด' }))
-      alert('สั่งออเดอร์ไม่สำเร็จ: ' + (err.error || ''))
+      showToast('สั่งออเดอร์ไม่สำเร็จ: ' + (err.error || ''), 'error')
       return
     }
 
     setCart(new Map())
     setShowCart(false)
-    alert('✅ สั่งออเดอร์สำเร็จ! รอร้านค้ายืนยัน')
+    showToast('สั่งออเดอร์สำเร็จ! รอร้านค้ายืนยัน', 'success')
   }
 
   return (

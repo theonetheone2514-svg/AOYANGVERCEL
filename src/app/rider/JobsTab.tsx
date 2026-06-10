@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice, getElapsedMinutes } from '@/lib/utils'
-import { showOrderToast } from '@/components/Toast'
+import { showOrderToast, showToast } from '@/components/Toast'
 import EmptyState from '@/components/EmptyState'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -117,7 +117,7 @@ export default function JobsTab({ rider, onUpdate }: Props) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'เกิดข้อผิดพลาด' }))
-      alert(err.error || '⚠️ ไม่สามารถรับงานได้')
+      showToast(err.error || 'ไม่สามารถรับงานได้', 'error')
       loadJobs()
       return
     }
@@ -138,7 +138,7 @@ export default function JobsTab({ rider, onUpdate }: Props) {
     })
 
     if (!res.ok) {
-      alert('⚠️ ยืนยันไม่สำเร็จ ลองใหม่อีกครั้ง')
+      showToast('ยืนยันไม่สำเร็จ ลองใหม่อีกครั้ง', 'error')
       setConfirming(false)
       return
     }

@@ -65,6 +65,17 @@ export default function OrdersPage() {
     loadOrders()
   }, [user, authLoading, loadOrders, router])
 
+  useEffect(() => {
+    if (!customerId) return
+    const channel = supabase
+      .channel('customer-orders')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `customer_id=eq.${customerId}` }, () => {
+        loadOrders()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [customerId, loadOrders])
+
   const filtered = filter === 'ทั้งหมด'
     ? orders
     : orders.filter((o) => o.status === filter)

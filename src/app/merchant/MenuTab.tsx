@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { formatPrice } from '@/lib/utils'
 import { getCsrfHeaders } from '@/lib/csrf-client'
+import { showToast } from '@/components/Toast'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import EmptyState from '@/components/EmptyState'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -25,6 +26,8 @@ export default function MenuTab({ storeId }: Props) {
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [showCatInput, setShowCatInput] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
   const [form, setForm] = useState({ name: '', price: '', category: '', stock: 99, image_url: '' })
 
   const load = useCallback(async () => {
@@ -178,19 +181,45 @@ export default function MenuTab({ storeId }: Props) {
                 <option key={c} value={c}>{categoryEmoji[c] || '🍽️'} {c}</option>
               ))}
             </select>
-            <button
-              onClick={() => {
-                const cat = prompt('ชื่อหมวดหมู่ใหม่:')
-                if (cat?.trim()) {
-                  setForm({ ...form, category: cat.trim() })
-                  setCategories((prev) => [...new Set([...prev, cat.trim()])])
-                }
-              }}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm hover:bg-gray-50 transition shrink-0"
-              title="เพิ่มหมวดหมู่ใหม่"
-            >
-              +
-            </button>
+            {showCatInput ? (
+              <div className="flex gap-1">
+                <input
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="ชื่อหมวดหมู่"
+                  className="border border-gray-300 rounded-lg px-2 py-1 text-sm w-28"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newCatName.trim()) {
+                      setForm({ ...form, category: newCatName.trim() })
+                      setCategories((prev) => [...new Set([...prev, newCatName.trim()])])
+                      setNewCatName('')
+                      setShowCatInput(false)
+                    }
+                    if (e.key === 'Escape') { setShowCatInput(false); setNewCatName('') }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (newCatName.trim()) {
+                      setForm({ ...form, category: newCatName.trim() })
+                      setCategories((prev) => [...new Set([...prev, newCatName.trim()])])
+                      setNewCatName('')
+                    }
+                    setShowCatInput(false)
+                  }}
+                  className="text-xs bg-[#E65100] text-white rounded-lg px-2 py-1"
+                >OK</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowCatInput(true)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm hover:bg-gray-50 transition shrink-0"
+                title="เพิ่มหมวดหมู่ใหม่"
+              >
+                +
+              </button>
+            )}
           </div>
           {/* Image upload */}
           <div>
@@ -210,7 +239,7 @@ export default function MenuTab({ storeId }: Props) {
                     const data = await res.json()
                     if (data.url) setForm({ ...form, image_url: data.url })
                   } catch {
-                    alert('อัปโหลดรูปไม่สำเร็จ')
+                    showToast('อัปโหลดรูปไม่สำเร็จ', 'error')
                   }
                   setUploading(false)
                 }}
