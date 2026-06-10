@@ -61,8 +61,31 @@ scripts/        # PWA icon generation, LINE rich menu setup, DB backup
 - **Order statuses**: Thai strings (`รอดำเนินการ`, `กำลังเตรียมอาหาร`, etc.) — not English.
 - **Tests**: Only `src/**/*.test.ts` (vitest, node env). Currently 4 test files in `src/lib/`.
 - **CSS**: Tailwind v4 via `@tailwindcss/postcss` plugin (not v3 config style).
-- **Sentry**: Wraps next.config via `withSentryConfig`.
+- **Sentry**: Wraps next.config via `withSentryConfig`. Error boundaries (`error.tsx`) call `Sentry.captureException()` — all 4 (root/admin/merchant/rider).
 - **PWA**: Service worker at `/sw.js`, icon generation in `scripts/generate-pwa-icons.mjs` runs as prebuild.
-- **Cron**: Vercel cron hits `/api/cron/rate-limit-cleanup` daily (see `vercel.json`).
+- **Cron**: Vercel cron hits `/api/cron/rate-limit-cleanup` daily (see `vercel.json`). Requires `CRON_SECRET` — returns 500 if missing.
 - **DB migrations**: Manual SQL files in `supabase/migrations/`, not Drizzle/Prisma.
 - **ESLint**: Flat config, relaxes `no-explicit-any`, `no-img-element`, and several React hooks rules.
+
+## Security Architecture
+
+- **Middleware**: Fail-closed — redirects to login if Supabase env vars missing. CSP nonce on every response. Role-based route protection.
+- **CSRF**: Double-submit cookie pattern with `timingSafeEqual` in `src/lib/csrf.ts`. All mutation routes use `withAuth` wrapper which enforces origin + CSRF validation.
+- **Rate limiting**: DB-backed via Supabase RPC `rate_limit_check()`. Applied to: auth endpoints, order creation, uploads, rider actions, LINE webhook.
+- **OTP**: SHA-256 hashed (`sha256(phone:otp)`), 5-min TTL, single-use. Used for registration and LINE linking.
+- **Stores API**: `select('id, name, image_url, status, wait_time, active, created_at')` — never `select('*')` to avoid leaking `phone` and `line_user_id`.
+- **Ratings**: POST verifies `order.customer_id === session.user_id` before inserting.
+- **Orders**: GET + PATCH enforce ownership checks per role (customer owns order, merchant owns store, rider assigned to order).
+
+## UI Conventions
+
+- **Toast notifications**: Use `showToast(message, type)` from `src/components/Toast.tsx` — never `alert()` or `prompt()`. Types: `'success' | 'error' | 'info'`. Auto-dismiss after 3s.
+- **Order toasts**: Use `showOrderToast({ id, title, message, total })` for new order notifications (auto-dismiss 5s).
+- **Toast container**: Mounted in `ClientLayout.tsx` — do not add a second instance.
+- **BottomNav**: Filters links by user role via `useAuth()`. Customer sees only home; merchant sees home + merchant + dashboard; rider sees home + rider; admin sees home + dashboard.
+
+## Data Patterns
+
+- **Delivery fee**: Stored in `settings` table (`key: 'delivery_fee'`), fetched at page load. Never hardcode.
+- **Realtime**: Merchant + Rider portals use Supabase Realtime for live order updates. Customer orders page (`/orders`) also has Realtime subscription on `customer_id`.
+- **Session → user_id mapping**: For merchants, `session.user_id` = store ID (e.g. "S01"). For riders, `session.user_id` = rider UUID. For customers, `session.user_id` = customer UUID. Do NOT query stores/riders table to resolve — use `session.user_id` directly.
