@@ -8,7 +8,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
 
   const { data: store, error: storeError } = await supabase
-    .from('stores').select('*').eq('id', id).single()
+    .from('stores').select('id, name, image_url, status, wait_time, active, created_at').eq('id', id).single()
   if (storeError) return NextResponse.json({ error: storeError.message }, { status: 500 })
   if (!store) return NextResponse.json({ error: 'ไม่พบร้านค้า' }, { status: 404 })
 

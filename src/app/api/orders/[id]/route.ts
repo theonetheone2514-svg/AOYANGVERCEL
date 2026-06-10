@@ -71,11 +71,8 @@ export const PATCH = withAuth(async (request: Request, session, params) => {
   const { data: existingOrder } = await admin.from('orders').select('store_id, rider_id, customer_id').eq('id', id).single()
   if (!existingOrder) return NextResponse.json({ error: 'ไม่พบออเดอร์' }, { status: 404 })
 
-  if (session.user_type === 'merchant') {
-    const { data: store } = await admin.from('stores').select('id').eq('user_id', session.user_id).single()
-    if (!store || store.id !== existingOrder.store_id) {
-      return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 })
-    }
+  if (session.user_type === 'merchant' && existingOrder.store_id !== session.user_id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 })
   }
   if (session.user_type === 'rider' && existingOrder.rider_id !== session.user_id) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 })

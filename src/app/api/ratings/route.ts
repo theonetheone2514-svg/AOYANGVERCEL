@@ -15,6 +15,12 @@ export const POST = withAuth(async (request: Request, session) => {
     return NextResponse.json({ error: 'คะแนนต้องอยู่ระหว่าง 1-5' }, { status: 400 })
   }
 
+  const { data: order } = await supabase
+    .from('orders').select('customer_id').eq('id', order_id).single()
+  if (!order || order.customer_id !== customer_id) {
+    return NextResponse.json({ error: 'ไม่มีสิทธิ์ให้คะแนนออเดอร์นี้' }, { status: 403 })
+  }
+
   const { data, error } = await supabase
     .from('ratings')
     .insert({ order_id, customer_id, store_id, rating, review: review || null })
